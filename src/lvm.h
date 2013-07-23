@@ -21,6 +21,11 @@
 
 #define luaV_rawequalobj(o1,o2)		equalobj(NULL,o1,o2)
 
+#define checkGC(L,c)  \
+  Protect( luaC_condGC(L,{L->top = (c);  /* limit of live values */ \
+                          luaC_step(L); \
+                          L->top = ci->top;})  /* restore top */ \
+           luai_threadyield(L); )
 
 /* not to called directly */
 LUAI_FUNC int luaV_equalobj_ (lua_State *L, const TValue *t1, const TValue *t2);
@@ -40,5 +45,7 @@ LUAI_FUNC void luaV_concat (lua_State *L, int total);
 LUAI_FUNC void luaV_arith (lua_State *L, StkId ra, const TValue *rb,
                            const TValue *rc, TMS op);
 LUAI_FUNC void luaV_objlen (lua_State *L, StkId ra, const TValue *rb);
-
+LUAI_FUNC Closure *getcached (Proto *p, UpVal **encup, StkId base);
+LUAI_FUNC void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
+		                         StkId ra);
 #endif

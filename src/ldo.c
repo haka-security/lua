@@ -30,7 +30,9 @@
 #include "lundump.h"
 #include "lvm.h"
 #include "lzio.h"
-
+#ifdef LUA_USE_JIT
+#include "jit/ljit.h"
+#endif
 
 
 
@@ -342,6 +344,9 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
       luaC_checkGC(L);  /* stack grow uses memory */
       if (L->hookmask & LUA_MASKCALL)
         callhook(L, ci);
+#ifdef LUA_USE_JIT
+	  luaJ_create(L, ci);
+#endif
       return 0;
     }
     default: {  /* not a function */

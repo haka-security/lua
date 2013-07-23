@@ -376,7 +376,7 @@ void luaV_arith (lua_State *L, StkId ra, const TValue *rb,
 ** whether there is a cached closure with the same upvalues needed by
 ** new closure to be created.
 */
-static Closure *getcached (Proto *p, UpVal **encup, StkId base) {
+Closure *getcached (Proto *p, UpVal **encup, StkId base) {
   Closure *c = p->cache;
   if (c != NULL) {  /* is there a cached closure? */
     int nup = p->sizeupvalues;
@@ -398,7 +398,7 @@ static Closure *getcached (Proto *p, UpVal **encup, StkId base) {
 ** before the assignment to 'p->cache', as the function needs the
 ** original value of that field.
 */
-static void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
+void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
                          StkId ra) {
   int nup = p->sizeupvalues;
   Upvaldesc *uv = p->upvalues;
@@ -516,7 +516,6 @@ void luaV_finishOp (lua_State *L) {
                           L->top = ci->top;})  /* restore top */ \
            luai_threadyield(L); )
 
-
 #define arith_op(op,tm) { \
         TValue *rb = RKB(i); \
         TValue *rc = RKC(i); \
@@ -541,6 +540,13 @@ void luaV_execute (lua_State *L) {
   cl = clLvalue(ci->func);
   k = cl->p->k;
   base = ci->u.l.base;
+#ifdef LUA_USE_JIT
+  if (lua_getjit(L) && cl->p->jit != NULL) {
+		void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
+              TValue *k) = (void *)cl->p->jit;
+		return jitexecute(L, ci, cl, k);
+  }
+#endif
   /* main loop of interpreter */
   for (;;) {
     Instruction i = *(ci->u.l.savedpc++);

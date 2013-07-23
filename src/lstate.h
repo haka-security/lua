@@ -77,6 +77,7 @@ typedef struct CallInfo {
     struct {  /* only for Lua functions */
       StkId base;  /* base for this function */
       const Instruction *savedpc;
+      ptrdiff_t jitoffset;
     } l;
     struct {  /* only for C functions */
       int ctx;  /* context info. in case of yields */
@@ -145,6 +146,7 @@ typedef struct global_State {
   TString *memerrmsg;  /* memory-error message */
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
+  int jitenable;
 } global_State;
 
 

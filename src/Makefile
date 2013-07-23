@@ -7,8 +7,8 @@
 PLAT= none
 
 CC= gcc
-CFLAGS= -O2 -Wall -DLUA_COMPAT_ALL $(SYSCFLAGS) $(MYCFLAGS)
-LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS)
+CFLAGS= -g -O2 -Wall -DLUA_COMPAT_ALL $(SYSCFLAGS) $(MYCFLAGS)
+LDFLAGS= $(SYSLDFLAGS) $(MYLDFLAGS) -g
 LIBS= -lm $(SYSLIBS) $(MYLIBS)
 
 AR= ar rcu
@@ -26,14 +26,14 @@ MYOBJS=
 
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
-PLATS= aix ansi bsd freebsd generic linux macosx mingw posix solaris
+PLATS= aix ansi bsd freebsd generic linux linuxjit macosx mingw posix solaris
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
-	ltm.o lundump.o lvm.o lzio.o
+	ltm.o lundump.o lvm.o lzio.o jit/ljit.o jit/ljitvm.o
 LIB_O=	lauxlib.o lbaselib.o lbitlib.o lcorolib.o ldblib.o liolib.o \
-	lmathlib.o loslib.o lstrlib.o ltablib.o loadlib.o linit.o
+	lmathlib.o loslib.o lstrlib.o ltablib.o loadlib.o linit.o jit/ljit.o jit/ljitvm.o
 BASE_O= $(CORE_O) $(LIB_O) $(MYOBJS)
 
 LUA_T=	lua
@@ -105,6 +105,9 @@ generic: $(ALL)
 linux:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -ldl -lreadline"
 
+linuxjit:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_JIT -fPIC" SYSLIBS="-Wl,-E -ldl -lreadline"
+
 macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX" SYSLIBS="-lreadline"
 
@@ -142,7 +145,7 @@ ldebug.o: ldebug.c lua.h luaconf.h lapi.h llimits.h lstate.h lobject.h \
  lfunc.h lstring.h lgc.h ltable.h lvm.h
 ldo.o: ldo.c lua.h luaconf.h lapi.h llimits.h lstate.h lobject.h ltm.h \
  lzio.h lmem.h ldebug.h ldo.h lfunc.h lgc.h lopcodes.h lparser.h \
- lstring.h ltable.h lundump.h lvm.h
+ lstring.h ltable.h lundump.h lvm.h jit/ljit.h
 ldump.o: ldump.c lua.h luaconf.h lobject.h llimits.h lstate.h ltm.h \
  lzio.h lmem.h lundump.h
 lfunc.o: lfunc.c lua.h luaconf.h lfunc.h lobject.h llimits.h lgc.h \
@@ -184,4 +187,10 @@ lvm.o: lvm.c lua.h luaconf.h ldebug.h lstate.h lobject.h llimits.h ltm.h \
  lzio.h lmem.h ldo.h lfunc.h lgc.h lopcodes.h lstring.h ltable.h lvm.h
 lzio.o: lzio.c lua.h luaconf.h llimits.h lmem.h lstate.h lobject.h ltm.h \
  lzio.h
+jit/ljit.o: jit/ljit.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
+	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
+	lzio.h jit/ljit.h jit/arch/ljit_linux_x86_64.h
+jit/ljitvm.o: jit/ljitvm.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
+	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
+	lzio.h jit/ljit.h jit/arch/ljit_linux_x86_64.h
 
