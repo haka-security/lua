@@ -37,7 +37,7 @@ RM= rm -f
 
 # Convenience platforms targets.
 PLATS= aix ansi bsd freebsd generic linux macosx mingw posix solaris
-JITPLATS= linuxjit macosxjit
+JITPLATS= linuxjit macosxjit freebsdjit
 
 # What to install.
 TO_BIN= lua luac

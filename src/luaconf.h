@@ -55,9 +55,20 @@
 #define LUA_USE_LONGLONG	/* assume support for long long */
 #endif
 
+#if defined(LUA_USE_FREEBSD) && defined(LUA_USE_JIT)
+#if defined(__LP64__) || defined(_LP64)
+#define LUA_USE_JIT_FREEBSD_X86_64
+#undef LUA_USE_JIT_LINUX_X86_64
+#else
+#error "Jit is not available for FreeBSD 32bit target"
+#endif /* defined(__LP64__) || defined(_LP64) */
+#endif
+
 #if defined(LUA_USE_MACOSX)
 #if defined(LUA_USE_JIT)
 #define LUA_USE_JIT_MACOSX_X86_64
+#else
+#error "Jit is not available for MacOS 32bit target"
 #endif
 #define LUA_USE_POSIX
 #define LUA_USE_DLOPEN		/* does not need -ldl */

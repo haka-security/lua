@@ -15,6 +15,8 @@
 #include "arch/linux_x86_64.h"
 #elif defined LUA_USE_JIT_MACOSX_X86_64
 #include "arch/macosx_x86_64.h"
+#elif defined LUA_USE_JIT_FREEBSD_X86_64
+#include "arch/freebsd_x86_64.h"
 #else
 #error "Jit is not supported for this plateform"
 #endif

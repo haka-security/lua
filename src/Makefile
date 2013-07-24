@@ -27,7 +27,7 @@ MYOBJS=
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
 PLATS= aix ansi bsd freebsd generic linux macosx mingw posix solaris
-JITPLATS= linuxjit macosxjit
+JITPLATS= linuxjit macosxjit freebsdjit
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
@@ -106,6 +106,9 @@ bsd:
 
 freebsd:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -lreadline"
+
+freebsdjit:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_FREEBSD -DLUA_USE_JIT" SYSLIBS="-Wl,-E -lreadline"
 
 generic: $(ALL)
 
@@ -206,8 +209,10 @@ lzio.o: lzio.c lua.h luaconf.h llimits.h lmem.h lstate.h lobject.h ltm.h \
 ifeq ($(JIT),y)
 jit/ljit.o: jit/ljit.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
-	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h
+	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h \
+	jit/arch/freebsd_x86_64.h
 jit/ljitvm.o: jit/ljitvm.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
-	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h
+	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h \
+	jit/arch/freebsd_x86_64.h
 endif
