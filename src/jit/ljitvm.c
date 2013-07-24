@@ -470,3 +470,4 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 	}
 	return 0;
 }
+

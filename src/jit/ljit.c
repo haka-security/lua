@@ -11,9 +11,6 @@
 #include "../lvm.h"
 #include "ljit.h"
 
-#ifdef LUA_USE_JIT
-
-
 #if defined LUA_USE_JIT_LINUX_X86_64
 #include "arch/linux_x86_64.h"
 #elif defined LUA_USE_JIT_MACOSX_X86_64
@@ -214,13 +211,3 @@ void luaJ_init_offset(CallInfo *ci)
 	/* Create initial offset for jmpq in prologu */
 	ci->u.l.jitoffset = PROLOGUE_LEN;
 }
-#else
-int luaJ_create(lua_State* L, CallInfo *ci)
-{
-	return 0;
-}
-void luaJ_init_offset(CallInfo *ci)
-{
-	return;
-}
-#endif /* LUA_USE_JIT */
