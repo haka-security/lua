@@ -2,20 +2,13 @@
 #define __ljit_h__
 
 #include "../lobject.h"
+#include <stdint.h>
 
 //#define JIT_DEBUG
 
 #define CASE_OP(op) case (op): \
-						JIT_##op; \
-						break;
-
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-typedef unsigned long  uint64_t;
-typedef short          int16_t;
-typedef int            int32_t;
-typedef long           int64_t;
+	JIT_##op; \
+	break;
 
 static inline uint8_t *append(uint8_t *ptr, uint64_t bytes, unsigned int len)
 {

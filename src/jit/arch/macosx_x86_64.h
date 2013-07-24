@@ -1,7 +1,7 @@
-#ifndef __ljit_linux_x86_64_h__
-#define __ljit_linux_x86_64_h__
+#ifndef __macos_x86_64_h__
+#define __macos_x86_64_h__
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/user.h>
 #include "../ljit.h"
@@ -977,15 +977,60 @@ static int jit_opcodes[NUM_OPCODES] =
 	/* call vm_testset */ \
 	APPEND2(0xff, 0xd0); \
 
+static inline void *_memalign(size_t size)
+{
+	size_t paddedSize;
+	void **buf;
+	void **alignedResult;
+#define PAGE_MASK (PAGE_SIZE - 1)
+#define PAGE_ROUND_DOWN(_value) ((uintptr_t)(_value) & ~PAGE_MASK)
+#define PAGE_ROUND_UP(_value) PAGE_ROUND_DOWN((uintptr_t)(_value) + PAGE_MASK)
+	/*
+	* This implementation allocates PAGE_SIZE extra bytes with
+	* malloc() to ensure the buffer spans a page-aligned memory
+	* address, which we return.  (We could use PAGE_SIZE - 1 to save a
+	* byte if we ensured 'size' was non-zero.)
+	* After padding, we allocate an extra pointer to hold the original
+	* pointer returned by malloc() (stored immediately preceding the
+	* page-aligned address).  We free this in AlignedFreeImpl().
+	* Finally, we allocate enough space to hold 'size' bytes.
+	*/
+
+	paddedSize = PAGE_SIZE + sizeof *buf + size;
+
+	// Check for overflow.
+	if (paddedSize < size) {
+		return NULL;
+	}
+	buf = (void **)malloc(paddedSize);
+	if (!buf) {
+		return NULL;
+	}
+	alignedResult = (void **)PAGE_ROUND_UP(buf + 1);
+	*(alignedResult - 1) = buf;
+#undef PAGE_MASK
+#undef PAGE_ROUND_DOWN
+#undef PAGE_ROUND_UP
+	return alignedResult;
+}
+
+static inline void jit_free(Proto *p)
+{
+	if (!p->jit) {
+		return;
+	}
+	free(*((void **)p->jit - 1));
+	p->jit = NULL;
+}
+
 
 static inline int jit_alloc(Proto *p)
 {
-	p->jit = memalign(PAGE_SIZE, p->sizejit);
+	p->jit = _memalign(p->sizejit);
 	if (!p->jit) return 1;
 
 	if (mprotect(p->jit, p->sizejit, PROT_EXEC|PROT_READ|PROT_WRITE) == -1) {
-		free(p->jit);
-		p->jit = NULL;
+		jit_free(p);
 		return 1;
 	}
 	return 0;

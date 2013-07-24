@@ -56,6 +56,9 @@
 #endif
 
 #if defined(LUA_USE_MACOSX)
+#if defined(LUA_USE_JIT)
+#define LUA_USE_JIT_MACOSX_X86_64
+#endif
 #define LUA_USE_POSIX
 #define LUA_USE_DLOPEN		/* does not need -ldl */
 #define LUA_USE_READLINE	/* needs an extra library: -lreadline */

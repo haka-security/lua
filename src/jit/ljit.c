@@ -14,8 +14,10 @@
 #ifdef LUA_USE_JIT
 
 
-#ifdef LUA_USE_JIT_LINUX_X86_64
-#include "arch/ljit_linux_x86_64.h"
+#if defined LUA_USE_JIT_LINUX_X86_64
+#include "arch/linux_x86_64.h"
+#elif defined LUA_USE_JIT_MACOSX_X86_64
+#include "arch/macosx_x86_64.h"
 #else
 #error "Jit is not supported for this plateform"
 #endif
@@ -182,8 +184,7 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 	}
 
 	if (get_jit(L, ci, p) != 0) {
-		free(p->jit);
-		p->jit = NULL;
+		jit_free(p);
 		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
 				p->sizejit, s, p->linedefined, p->lastlinedefined);
 		return 1;

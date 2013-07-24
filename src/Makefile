@@ -26,7 +26,7 @@ MYOBJS=
 
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
-PLATS= aix ansi bsd freebsd generic linux linuxjit macosx mingw posix solaris
+PLATS= aix ansi bsd freebsd generic linux linuxjit macosx macosxjit mingw posix solaris
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
@@ -111,6 +111,9 @@ linuxjit:
 macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX" SYSLIBS="-lreadline"
 
+macosxjit:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_JIT" SYSLIBS="-lreadline"
+
 mingw:
 	$(MAKE) "LUA_A=lua52.dll" "LUA_T=lua.exe" \
 	"AR=$(CC) -shared -o" "RANLIB=strip --strip-unneeded" \
@@ -189,8 +192,8 @@ lzio.o: lzio.c lua.h luaconf.h llimits.h lmem.h lstate.h lobject.h ltm.h \
  lzio.h
 jit/ljit.o: jit/ljit.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
-	lzio.h jit/ljit.h jit/arch/ljit_linux_x86_64.h
+	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h
 jit/ljitvm.o: jit/ljitvm.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
-	lzio.h jit/ljit.h jit/arch/ljit_linux_x86_64.h
+	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h
 
