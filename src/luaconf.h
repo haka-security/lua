@@ -64,12 +64,15 @@
 #endif /* defined(__LP64__) || defined(_LP64) */
 #endif
 
-#if defined(LUA_USE_MACOSX)
-#if defined(LUA_USE_JIT)
+#if defined(LUA_USE_MACOSX) && defined(LUA_USE_JIT)
+#if defined(__LP64__) || defined(_LP64)
 #define LUA_USE_JIT_MACOSX_X86_64
 #else
 #error "Jit is not available for MacOS 32bit target"
-#endif
+#endif /* defined(__LP64__) || defined(_LP64) */
+#endif /* defined(LUA_USE_MACOSX) && defined(LUA_USE_JIT) */
+
+#if defined(LUA_USE_MACOSX)
 #define LUA_USE_POSIX
 #define LUA_USE_DLOPEN		/* does not need -ldl */
 #define LUA_USE_READLINE	/* needs an extra library: -lreadline */
