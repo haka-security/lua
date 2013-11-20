@@ -123,7 +123,7 @@ static int jit_opcodes[NUM_OPCODES] =
 	48, /* OP_SETTABUP */
 	32, /* OP_SETUPVAL */
 	55, /* OP_SETTABLE */
-	41, /* OP_NEWTABLE */
+	45, /* OP_NEWTABLE */
 	55, /* OP_SELF */
 	55, /* OP_ADD */
 	55,	/* OP_SUB */
@@ -688,7 +688,8 @@ static int jit_opcodes[NUM_OPCODES] =
 	APPEND2(0x48, 0xb8); \
 	APPEND((uint64_t)&vm_newtable, 8); \
 	/* call vm_newtable */ \
-	APPEND2(0xff, 0xd0);
+	APPEND2(0xff, 0xd0); \
+	JIT_RESETBASE; \
 
 #define JIT_OP_SETUPVAL \
 	/* mov %rbx, %rdi */ \

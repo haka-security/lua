@@ -123,7 +123,7 @@ static int jit_opcodes[NUM_OPCODES] =
 	48, /* OP_SETTABUP */
 	32, /* OP_SETUPVAL */
 	55, /* OP_SETTABLE */
-	41, /* OP_NEWTABLE */
+	45, /* OP_NEWTABLE */
 	55, /* OP_SELF */
 	55, /* OP_ADD */
 	55,	/* OP_SUB */
@@ -688,7 +688,8 @@ static int jit_opcodes[NUM_OPCODES] =
 	APPEND2(0x48, 0xb8); \
 	APPEND((uint64_t)&vm_newtable, 8); \
 	/* call vm_newtable */ \
-	APPEND2(0xff, 0xd0);
+	APPEND2(0xff, 0xd0); \
+	JIT_RESETBASE;
 
 #define JIT_OP_SETUPVAL \
 	/* mov %rbx, %rdi */ \
@@ -977,43 +978,6 @@ static int jit_opcodes[NUM_OPCODES] =
 	/* call vm_testset */ \
 	APPEND2(0xff, 0xd0); \
 
-static inline void *_memalign(size_t size)
-{
-	size_t paddedSize;
-	void **buf;
-	void **alignedResult;
-#define PAGE_MASK (PAGE_SIZE - 1)
-#define PAGE_ROUND_DOWN(_value) ((uintptr_t)(_value) & ~PAGE_MASK)
-#define PAGE_ROUND_UP(_value) PAGE_ROUND_DOWN((uintptr_t)(_value) + PAGE_MASK)
-	/*
-	* This implementation allocates PAGE_SIZE extra bytes with
-	* malloc() to ensure the buffer spans a page-aligned memory
-	* address, which we return.  (We could use PAGE_SIZE - 1 to save a
-	* byte if we ensured 'size' was non-zero.)
-	* After padding, we allocate an extra pointer to hold the original
-	* pointer returned by malloc() (stored immediately preceding the
-	* page-aligned address).  We free this in AlignedFreeImpl().
-	* Finally, we allocate enough space to hold 'size' bytes.
-	*/
-
-	paddedSize = PAGE_SIZE + sizeof *buf + size;
-
-	// Check for overflow.
-	if (paddedSize < size) {
-		return NULL;
-	}
-	buf = (void **)malloc(paddedSize);
-	if (!buf) {
-		return NULL;
-	}
-	alignedResult = (void **)PAGE_ROUND_UP(buf + 1);
-	*(alignedResult - 1) = buf;
-#undef PAGE_MASK
-#undef PAGE_ROUND_DOWN
-#undef PAGE_ROUND_UP
-	return alignedResult;
-}
-
 static inline void jit_free(Proto *p)
 {
 	if (!p->jit) {
@@ -1023,11 +987,9 @@ static inline void jit_free(Proto *p)
 	p->jit = NULL;
 }
 
-
 static inline int jit_alloc(Proto *p)
 {
-	p->jit = _memalign(p->sizejit);
-	if (!p->jit) return 1;
+	if (posix_memalign((void **)(&p->jit), PAGE_SIZE, p->sizejit) != 0) return 1;
 
 	if (mprotect(p->jit, p->sizejit, PROT_EXEC|PROT_READ|PROT_WRITE) == -1) {
 		jit_free(p);
