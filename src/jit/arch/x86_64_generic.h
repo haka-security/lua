@@ -1,6 +1,7 @@
 #ifndef __x86_64_generic_h__
 #define __x86_64_generic_h__
 
+/* Jumps constants */
 #define X86_JB  0x72
 #define X86_JAE 0x73
 #define X86_JE  0x74
@@ -8,28 +9,16 @@
 #define X86_JBE 0x76
 #define X86_JA  0x77
 
-
-#define JIT_REG_RDI 0
-#define JIT_REG_RSI 1
-#define JIT_REG_RDX 2
-#define JIT_REG_RCX 3
-#define JIT_REG_R8  4
-#define JIT_REG_R9  5
-
 /*
- * Conventions :
- *  RBP : frame pointer
- * -8(RBP): Lua state
- * -32(RBP) : saved R14
- * -40(RBP): save R15
- * -48(RBP): &savedpc
- * -56(RBP): &jitoffset
- * -64(RBP): cl->p->code
- * -72(RBP): saved RAX
- * -80(RBP): saved RBX
- * -88(RBP): saved R13
+ * Registers :
+ *  %rbp : frame pointer
+ *  %rax : scratch register
+ *  %r10 : scratch register
+ *  %rbx : L (Lua state) callee saved register
+ *  %r13 : ci (Call Info) callee saved register
+ *  %r14 : k (constant base) callee saved register
+ *  %r15 : base (stack base) callee saved register
  */
-
 
 #define JIT_RKBC(arg) \
 	if (ISK(arg)) { \
@@ -155,15 +144,15 @@ static int jit_opcodes[NUM_OPCODES] =
 	APPEND4(0x48, 0x83, 0xec, 96);    /* subq  $96,%rsp       */ \
 	/* First, save registers */ \
 	JIT_SAVE_REGISTERS; \
-	/* put L in stack */ \
+	/* put L in %rbx */ \
 	APPEND3(0x48, 0x89, 0xfb); /* mov %rdi, %rbx */ \
 	/* put ci in r13 */ \
 	APPEND3(0x49, 0x89, 0xf5); \
 	/* put k in r14 */ \
 	APPEND3(0x49, 0x89, 0xce); /* mov %rcx, %r14 */ \
-	/* put base in stack */ \
+	/* put base in r15 */ \
 	JIT_RESETBASE; \
-	/* put &savedpc in stack */ \
+	/* put &savedpc in stack (-48(%rbp))*/ \
 	/* lea offset8(%r13),%rax */ \
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
 	/* mov %rax,-48(%rbp) */ \
