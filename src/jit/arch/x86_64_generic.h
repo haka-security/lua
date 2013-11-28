@@ -15,9 +15,20 @@
  *  %rax : scratch register
  *  %r10 : scratch register
  *  %rbx : L (Lua state) callee saved register
+ *  %r12 : &savedpc
  *  %r13 : ci (Call Info) callee saved register
  *  %r14 : k (constant base) callee saved register
  *  %r15 : base (stack base) callee saved register
+ *
+ * Stack:
+ *  -8(%rbp):saved %rax register
+ *  -16(%rbp): saved %rbx callee saved register
+ *  -24(%rbp): saved %r12 callee saved register
+ *  -32(%rbp): saved %r13 callee saved register
+ *  -40(%rbp): saved %r14 callee saved register
+ *  -48(%rbp): saved %r15 callee saved register
+ *  -56(%rbp): jit code pointer
+ *  -64(%rbp): jitoffset address
  */
 
 #define JIT_RKBC(arg) \
@@ -51,47 +62,48 @@
 	APPEND4(0x4d, 0x8b, 0x7d, offsetof(CallInfo, u.l.base));
 
 #define JIT_UPDATEPC(off) \
-	/* mov -48(%rbp), %rax */ \
-	APPEND4(0x48, 0x8b, 0x45, 0xd0); \
-	/* mov -64(%rbp), %r10 */ \
-	APPEND4(0x4c, 0x8b, 0x55, 0xc0); \
-	/* mov %r10, (%rax) */ \
-	APPEND3(0x4c, 0x89, 0x10); \
-	/* addq sizeof(Instrcution), (%rax) */ \
-	APPEND3(0x48, 0x81, 0x00); \
+	/* mov -56(%rbp), %r10 */ \
+	APPEND4(0x4c, 0x8b, 0x55, 0xc8); \
+	/* mov %r10, (%r12) */ \
+	APPEND4(0x4d, 0x89, 0x14, 0x24); \
+	/* addq sizeof(Instrcution), (%r12) */ \
+	APPEND4(0x49, 0x81, 0x04, 0x24); \
 	APPEND((off)*sizeof(Instruction), 4);
 
 #define JIT_UPDATEOFFSET(off) \
-	/* mov -56(%rbp), %rax*/ \
-	APPEND4(0x48, 0x8b, 0x45, 0xc8); \
+	/* mov -64(%rbp), %rax*/ \
+	APPEND4(0x48, 0x8b, 0x45, 0xc0); \
 	/* movl off, (%rax) */ \
 	APPEND2(0xc7, 0x00); \
 	APPEND(off, 4);
 
 #define JIT_SAVE_REGISTERS \
-	/* mov %rax, -72(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xb8); \
-	/* mov %rbx, -80(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x5d, 0xb0); \
-	/* mov %r13, -88(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x6d, 0xa8); \
-	/* mov %r14, -32(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x75, 0xe0); \
-	/* mov %r15, -40(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x7d, 0xd8);
+	/* mov %rax, -8(%rbp) */ \
+	APPEND4(0x48, 0x89, 0x45, 0xf8); \
+	/* mov %rbx, -16(%rbp) */ \
+	APPEND4(0x48, 0x89, 0x5d, 0xf0); \
+	/* mov %r12, -24(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x65, 0xe8); \
+	/* mov %r13, -32(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x6d, 0xe0); \
+	/* mov %r14, -40(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x75, 0xd8); \
+	/* mov %r15, -48(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x7d, 0xd0);
 
 #define JIT_RESTORE_REGISTERS \
-	/* restore accumulators */ \
-	/* mov -72(%rbp), %rax */ \
-	APPEND4(0x48, 0x8b, 0x45, 0xb8); \
-	/* mov -80(%rbp), %rbx */ \
-	APPEND4(0x48, 0x8b, 0x5d, 0xb0); \
-	/* mov -88(%rbp), %r13 */ \
-	APPEND4(0x4c, 0x8b, 0x6d, 0xa8); \
-	/* mov -32(%rbp), %r14 */ \
-	APPEND4(0x4c, 0x8b, 0x75, 0xe0); \
-	/* mov -40(%rbp), %r15 */ \
-	APPEND4(0x4c, 0x8b, 0x7d, 0xd8);
+	/* mov -8(%rbp), %rax */ \
+	APPEND4(0x48, 0x8b, 0x45, 0xf8); \
+	/* mov -16(%rbp), %rbx */ \
+	APPEND4(0x48, 0x8b, 0x5d, 0xf0); \
+	/* mov -24(%rbp), %r12 */ \
+	APPEND4(0x4c, 0x8b, 0x65, 0xe8); \
+	/* mov -32(%rbp), %r13 */ \
+	APPEND4(0x4c, 0x8b, 0x6d, 0xe0); \
+	/* mov -40(%rbp), %r14 */ \
+	APPEND4(0x4c, 0x8b, 0x75, 0xd8); \
+	/* mov -48(%rbp), %r15 */ \
+	APPEND4(0x4c, 0x8b, 0x7d, 0xd0);
 
 
 static int jit_opcodes[NUM_OPCODES] =
@@ -125,9 +137,9 @@ static int jit_opcodes[NUM_OPCODES] =
 	54, /* OP_LE */
 	38, /* OP_TEST */
 	44, /* OP_TESTSET */
-	72, /* OP_CALL */
-	91, /* OP_TAILCALL */
-	89, /* OP_RETURN */
+	70, /* OP_CALL */
+	93, /* OP_TAILCALL */
+	91, /* OP_RETURN */
 	36, /* OP_FORLOOP */
 	32, /* OP_FORPREP */
 	39, /* OP_TFORCALL */
@@ -138,10 +150,10 @@ static int jit_opcodes[NUM_OPCODES] =
 	1, /* OP_EXTRAARG */
 };
 
-#define PROLOGUE_LEN 86
+#define PROLOGUE_LEN 89
 #define JIT_PROLOGUE \
 	APPEND4(0x55, 0x48, 0x89, 0xe5); /* push %rbp; mov %rsp,%rbp */ \
-	APPEND4(0x48, 0x83, 0xec, 96);    /* subq  $96,%rsp       */ \
+	APPEND4(0x48, 0x83, 0xec, 80);    /* subq  $72,%rsp       */ \
 	/* First, save registers */ \
 	JIT_SAVE_REGISTERS; \
 	/* put L in %rbx */ \
@@ -152,22 +164,27 @@ static int jit_opcodes[NUM_OPCODES] =
 	APPEND3(0x49, 0x89, 0xce); /* mov %rcx, %r14 */ \
 	/* put base in r15 */ \
 	JIT_RESETBASE; \
-	/* put &savedpc in stack (-48(%rbp))*/ \
+	\
+	/* put &savedpc %r12 */ \
 	/* lea offset8(%r13),%rax */ \
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
-	/* mov %rax,-48(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xd0); \
+	/* mov %rax, %r12 */ \
+	APPEND3(0x49, 0x89, 0xc4); \
+	\
+	/* put code in stack: -64(%rbp) */ \
 	/* mov offset8(%rdx), %r10 */ \
 	APPEND4(0x4c, 0x8b, 0x52, offsetof(LClosure, p)); \
 	/* mov offset8(%r10), %r10 */ \
 	APPEND4(0x4d, 0x8b, 0x52, offsetof(Proto, code)); \
-	/* mov %r10, -64(%rbp) */  \
-	APPEND4(0x4c, 0x89, 0x55, 0xc0); \
-	/* put &jitoffset in stack */ \
+	/* mov %r10, -56(%rbp) */  \
+	APPEND4(0x4c, 0x89, 0x55, 0xc8); \
+	\
+	/* put &jitoffset in stack: -64(%rbp)  */ \
 	/* lea offset8(%r13),%rax */ \
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.jitoffset)); \
-	/* mov %rax,-56(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xc8); \
+	/* mov %rax,-64(%rbp) */ \
+	APPEND4(0x48, 0x89, 0x45, 0xc0); \
+	\
 	/* Prepare initial Jump for coroutine (%rax) is now jitoffset */ \
 	/* mov offset8(%rdx), %r10 */ \
 	APPEND4(0x4c, 0x8b, 0x52, offsetof(LClosure, p)); \

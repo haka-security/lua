@@ -210,9 +210,9 @@ ifeq ($(JIT),y)
 jit/ljit.o: jit/ljit.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
 	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h \
-	jit/arch/freebsd_x86_64.h
+	jit/arch/freebsd_x86_64.h jit/arch/x86_64_generic.h
 jit/ljitvm.o: jit/ljitvm.c lua.h lapi.h ldebug.h ldo.h lfunc.h lgc.h lmem.h lobject.h \
 	lopcodes.h lparser.h lstate.h lstring.h ltable.h ltm.h lundump.h lvm.h \
 	lzio.h jit/ljit.h jit/arch/linux_x86_64.h jit/arch/macosx_x86_64.h \
-	jit/arch/freebsd_x86_64.h
+	jit/arch/freebsd_x86_64.h jit/arch/x86_64_generic.h
 endif
