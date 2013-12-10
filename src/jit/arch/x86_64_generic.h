@@ -1,3 +1,9 @@
+/*
+** x86_64_generic.h - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT implementation for x86_64 processors (Intel compat) with common ABI
+** See Copyright Notice in lua.h
+*/
+
 #ifndef __x86_64_generic_h__
 #define __x86_64_generic_h__
 
@@ -20,6 +26,8 @@
  *  %r13 : ci (Call Info) callee saved register
  *  %r14 : k (constant base) callee saved register
  *  %r15 : base (stack base) callee saved register
+ *
+ * ABI: %rdi, %rsi, %rdx, %rcx, %r8, %r9
  *
  * Stack:
  *  -8(%rbp):saved %rax register

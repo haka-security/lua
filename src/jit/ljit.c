@@ -1,3 +1,9 @@
+/*
+** ljit.c - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT skeleton
+** See Copyright Notice in lua.h
+*/
+
 #include <stdlib.h>
 #include <string.h>
 

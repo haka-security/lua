@@ -1,3 +1,9 @@
+/*
+** ljitvm.c - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT function calls (named virtual machine)
+** See Copyright Notice in lua.h
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

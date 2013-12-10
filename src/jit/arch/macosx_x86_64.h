@@ -1,3 +1,8 @@
+/*
+** macosx_x86_64.h - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT MacOS specific functions for x86_64
+** See Copyright Notice in lua.h
+*/
 #ifndef __macos_x86_64_h__
 #define __macos_x86_64_h__
 

@@ -1,3 +1,8 @@
+/*
+** linux_x86_64.h - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT Linux specific functions for x86_64
+** See Copyright Notice in lua.h
+*/
 #ifndef __linux_x86_64_h__
 #define __linux_x86_64_h__
 

@@ -1,3 +1,8 @@
+/*
+** freebsd_x86_64.h - Remi Bauzac (rbauzac@arkoon.net)
+** Lua JiT FreeBSD specific functions for x86_64
+** See Copyright Notice in lua.h
+*/
 #ifndef __freebsd_x86_64_h__
 #define __freebsd_x86_64_h__
 
