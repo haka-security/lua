@@ -3,7 +3,7 @@
 
 # == CHANGE THE SETTINGS BELOW TO SUIT YOUR ENVIRONMENT =======================
 
-# Your platform. See PLATS or JITPLATS for possible values.
+# Your platform. See PLATS for possible values.
 PLAT= none
 
 CC= gcc
@@ -27,7 +27,6 @@ MYOBJS=
 # == END OF USER SETTINGS -- NO NEED TO CHANGE ANYTHING BELOW THIS LINE =======
 
 PLATS= aix ansi bsd freebsd generic linux macosx mingw posix solaris
-JITPLATS= linuxjit macosxjit freebsdjit
 
 LUA_A=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
@@ -72,8 +71,13 @@ $(LUA_T): $(LUA_O) $(LUA_A)
 $(LUAC_T): $(LUAC_O) $(LUA_A)
 	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
 
+ifeq ($(JIT),y)
 clean:
 	$(RM) $(ALL_T) $(ALL_O) $(JIT_O)
+else
+clean:
+	$(RM) $(ALL_T) $(ALL_O)
+endif
 
 depend:
 	@$(CC) $(CFLAGS) -MM l*.c
@@ -104,25 +108,31 @@ ansi:
 bsd:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN" SYSLIBS="-Wl,-E"
 
+ifeq ($(JIT),y)
+freebsd:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_FREEBSD -DLUA_USE_JIT" SYSLIBS="-Wl,-E -lreadline"
+else
 freebsd:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -lreadline"
-
-freebsdjit:
-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_FREEBSD -DLUA_USE_JIT" SYSLIBS="-Wl,-E -lreadline"
+endif
 
 generic: $(ALL)
 
+ifeq ($(JIT),y)
+linux:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_JIT -fPIC" SYSLIBS="-Wl,-E -ldl -lreadline"
+else
 linux:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX" SYSLIBS="-Wl,-E -ldl -lreadline"
+endif
 
-linuxjit:
-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_LINUX -DLUA_USE_JIT -fPIC" SYSLIBS="-Wl,-E -ldl -lreadline"
-
+ifeq ($(JIT),y)
+macosx:
+	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_JIT" SYSLIBS="-lreadline"
+else
 macosx:
 	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX" SYSLIBS="-lreadline" CC=cc
-
-macosxjit:
-	$(MAKE) $(ALL) SYSCFLAGS="-DLUA_USE_MACOSX -DLUA_USE_JIT" SYSLIBS="-lreadline"
+endif
 
 mingw:
 	$(MAKE) "LUA_A=lua52.dll" "LUA_T=lua.exe" \

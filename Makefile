@@ -3,7 +3,7 @@
 
 # == CHANGE THE SETTINGS BELOW TO SUIT YOUR ENVIRONMENT =======================
 
-# Your platform. See PLATS or JITPLATS for possible values.
+# Your platform. See PLATS for possible values.
 PLAT= none
 
 # Where to install. The installation starts in the src and doc directories,
@@ -37,7 +37,6 @@ RM= rm -f
 
 # Convenience platforms targets.
 PLATS= aix ansi bsd freebsd generic linux macosx mingw posix solaris
-JITPLATS= linuxjit macosxjit freebsdjit
 
 # What to install.
 TO_BIN= lua luac
@@ -54,9 +53,6 @@ all:	$(PLAT)
 
 $(PLATS) clean:
 	cd src && $(MAKE) $@
-
-$(JITPLATS):
-	cd src && $(MAKE) JIT=y $@
 
 test:	dummy
 	src/lua -v
@@ -79,7 +75,7 @@ local:
 
 none:
 	@echo "Please do 'make PLATFORM' where PLATFORM is one of these:"
-	@echo "   $(PLATS) $(JITPLATS)"
+	@echo "   $(PLATS)"
 	@echo "See doc/readme.html for complete instructions."
 
 # make may get confused with test/ and install/
@@ -113,6 +109,6 @@ pc:
 	@echo "includedir=$(INSTALL_INC)"
 
 # list targets that do not create files (but not all makes understand .PHONY)
-.PHONY: all $(PLATS) $(JITPLATS) clean test install local none dummy echo pecho lecho
+.PHONY: all $(PLATS) clean test install local none dummy echo pecho lecho
 
 # (end of Makefile)
