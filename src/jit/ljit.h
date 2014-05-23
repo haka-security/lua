@@ -9,11 +9,12 @@
 #include "../lobject.h"
 #include <stdint.h>
 
-//#define JIT_DEBUG
+#define JIT_DEBUG
 
-#define CASE_OP(op) case (op): \
-	JIT_##op; \
-	break;
+struct jit_generator {
+  int (*size) (Proto *p, const Instruction *code, unsigned int *addrs, int pc);
+  uint8_t *(*create) (uint8_t *bin, Proto *p, const Instruction *code, unsigned int *addrs, int pc);
+};
 
 static inline uint8_t *append(uint8_t *ptr, uint64_t bytes, unsigned int len)
 {

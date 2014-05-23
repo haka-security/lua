@@ -460,6 +460,10 @@ typedef struct LocVar {
   int endpc;    /* first point where variable is dead */
 } LocVar;
 
+typedef struct StackTypes {
+  int sizetypes;
+  int types;
+} StackTypes;
 
 /*
 ** Function Prototypes
@@ -489,6 +493,7 @@ typedef struct Proto {
 #ifdef LUA_USE_JIT
   unsigned char *jit;
   int sizejit;
+  StackTypes *stypes;
 #endif
 } Proto;
 
