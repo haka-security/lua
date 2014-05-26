@@ -51,7 +51,7 @@ static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
 	uint8_t *prog;
 	int pc, proglen;
 	unsigned int *addrs; /* addresses of image addr offset */
-	const Instruction* c = p->code;
+	const Instruction* code = p->code;
 
 	prog = p->jit;
 
@@ -60,9 +60,9 @@ static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
 	if (!addrs) return 1;
 
 	for (proglen = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-		Instruction i = c[pc];
+//		Instruction i = code[pc];
 		addrs[pc]= proglen;
-		proglen += jit_opcodes[GET_OPCODE(i)];
+		proglen += generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
 	}
 	/* offset addrss for the least instruction */
 	addrs[pc] = proglen;
@@ -84,16 +84,17 @@ static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
 	for (pc = 0; pc < p->sizecode; pc++)  {
 		uint8_t *tmp = prog;
 		uint32_t clen = 0;
-		Instruction i = c[pc];
+		Instruction i = code[pc];
+    int jitcodesz = generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
 
-    if (generator[GET_OPCODE(c[pc])].create != NULL) {
-      prog = generator[GET_OPCODE(i)].create(prog, p, c, addrs, pc);
+    if (generator[GET_OPCODE(code[pc])].create != NULL) {
+      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
     }
 
 		clen = prog - tmp;
-		if (clen != jit_opcodes[GET_OPCODE(i)]) {
+		if (clen != jitcodesz) {
 			luaG_runerror(L, "Bad instruction size for instruction %s - %d/%d\n",
-					luaP_opnames[GET_OPCODE(i)], clen, jit_opcodes[GET_OPCODE(i)]);
+					luaP_opnames[GET_OPCODE(i)], clen, jitcodesz);
 		}
 
 	}
@@ -120,10 +121,10 @@ static int type_propagation(lua_State* L, CallInfo *ci)
     OpCode o=GET_OPCODE(i);
     int a=GETARG_A(i);
     int b=GETARG_B(i);
-    int c=GETARG_C(i);
+    //int c=GETARG_C(i);
     int ax=GETARG_Ax(i);
     int bx=GETARG_Bx(i);
-    int sbx=GETARG_sBx(i);
+    //int sbx=GETARG_sBx(i);
 
     switch(o) {
       TValue* v;
