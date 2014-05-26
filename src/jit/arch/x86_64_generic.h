@@ -56,14 +56,11 @@
 	APPEND3(0x48, 0x81, 0xc7);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RDI(arg) \
+#define RK_RDI(k) APPEND2(0x48, 0xbf);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RDI(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rdi */ \
-		APPEND3(0x4c, 0x89, 0xf7);\
-		/* add INDEXK(arg)*sizeof(TValue), %rdi */\
-		APPEND3(0x48, 0x81, 0xc7);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RDI(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RDI(arg); \
@@ -76,14 +73,11 @@
 	APPEND3(0x48, 0x81, 0xc6);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RSI(arg) \
+#define RK_RSI(k) APPEND2(0x48, 0xbe);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RSI(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rsi */ \
-		APPEND3(0x4c, 0x89, 0xf6);\
-		/* add INDEXK(arg)*sizeof(TValue), %rsi */\
-		APPEND3(0x48, 0x81, 0xc6);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RSI(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RSI(arg); \
@@ -96,14 +90,11 @@
 	APPEND3(0x48, 0x81, 0xc2);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RDX(arg) \
+#define RK_RDX(k) APPEND2(0x48, 0xba);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RDX(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rdx */ \
-		APPEND3(0x4c, 0x89, 0xf2);\
-		/* add INDEXK(arg)*sizeof(TValue), %rdx */\
-		APPEND3(0x48, 0x81, 0xc2);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RDX(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RDX(arg); \
@@ -116,14 +107,11 @@
 	APPEND3(0x48, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RCX(arg) \
+#define RK_RCX(k) APPEND2(0x48, 0xb9);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RCX(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rcx */ \
-		APPEND3(0x4c, 0x89, 0xf1);\
-		/* add INDEXK(arg)*sizeof(TValue), %rcx */\
-		APPEND3(0x48, 0x81, 0xc1);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RCX(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RCX(arg); \
@@ -136,14 +124,11 @@
 	APPEND3(0x49, 0x81, 0xc0);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_R8(arg) \
+#define RK_R8(k) APPEND2(0x49, 0xb8);APPEND((uint64_t)(k), 8);
+
+#define RKBC_R8(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %r8 */ \
-		APPEND3(0x4d, 0x89, 0xf0);\
-		/* add INDEXK(arg)*sizeof(TValue), %r8 */\
-		APPEND3(0x49, 0x81, 0xc0);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_R8(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_R8(arg); \
@@ -156,14 +141,11 @@
 	APPEND3(0x49, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_R9(arg) \
+#define RK_R9(k) APPEND2(0x49, 0xb9);APPEND((uint64_t)(k), 8);
+
+#define RKBC_R9(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %r8 */ \
-		APPEND3(0x4d, 0x89, 0xf1);\
-		/* add INDEXK(arg)*sizeof(TValue), %r8 */\
-		APPEND3(0x49, 0x81, 0xc1);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_R9(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_R9(arg); \
@@ -461,7 +443,7 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	/* mov GETARG_B(i), %esi */
 	APPEND1(0xbe);
 	APPEND(GETARG_B(code[pc]), 4);
-	RKBC_RDX(GETARG_C(code[pc]));
+	RKBC_RDX(GETARG_C(code[pc]), p);
 	RABC_RCX(GETARG_A(code[pc]));
   NOP4;
 	VM_CALL(vm_gettabup);
@@ -486,7 +468,7 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_B(code[pc]));
-	RKBC_RDX(GETARG_C(code[pc]));
+	RKBC_RDX(GETARG_C(code[pc]), p);
 	RABC_RCX(GETARG_A(code[pc]));
 	VM_CALL(luaV_gettable);
 	/* luaV_gettable can realloc base, reset it */
@@ -513,8 +495,8 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	/* mov GETARG_A(i), %esi */
 	APPEND1(0xbe);
 	APPEND(GETARG_A(code[pc]), 4);
-	RKBC_RDX(GETARG_B(code[pc]));
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_settabup);
 	/* vm_settabup can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -562,8 +544,8 @@ static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *co
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
-	RKBC_RDX(GETARG_B(code[pc]));
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_settable);
 	LUA_UPDATE_BASE;
   NOP7;
@@ -616,8 +598,8 @@ static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
-	RKBC_RDX(GETARG_B(code[pc]));
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_self);
 	LUA_UPDATE_BASE;
   NOP7;
@@ -641,9 +623,9 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_add);
 	/* vm_add can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -668,9 +650,9 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_sub);
 	/* vm_sub can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -695,9 +677,9 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_mul);
 	/* vm_mul can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -722,9 +704,9 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_div);
 	/* vm_div can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -749,9 +731,9 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_mod);
 	/* vm_mod can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -776,9 +758,9 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	/* Get RKB */
-	RKBC_RDX(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
 	/* Get RKC */
-	RKBC_RCX(GETARG_C(code[pc]));
+	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_pow);
 	/* vm_mod can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -803,7 +785,7 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x48, 0x89, 0xdf); \
 	RABC_RSI(GETARG_A(code[pc])); \
 	/* Get RKB */ \
-	RKBC_RDX(GETARG_B(code[pc])); \
+	RKBC_RDX(GETARG_B(code[pc]), p); \
 	VM_CALL(vm_unm); \
 	/* vm_unm can realloc base, reset it */ \
 	LUA_UPDATE_BASE;
@@ -933,8 +915,8 @@ static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
 	LUA_ADD_SAVEDPC(1);
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	RKBC_RSI(GETARG_B(code[pc]));
-	RKBC_RDX(GETARG_C(code[pc]));
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_eq);
 	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
@@ -961,8 +943,8 @@ static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
 	LUA_ADD_SAVEDPC(1);
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	RKBC_RSI(GETARG_B(code[pc]));
-	RKBC_RDX(GETARG_C(code[pc]));
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_lessthan);
 	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
@@ -989,8 +971,8 @@ static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
 	LUA_ADD_SAVEDPC(1);
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	RKBC_RSI(GETARG_B(code[pc]));
-	RKBC_RDX(GETARG_C(code[pc]));
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_lessequal);
 	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
