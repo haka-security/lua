@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define ljit_c
 #define LUA_CORE
@@ -167,6 +168,9 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 {
 	Proto *p;
 	const char* s;
+#ifdef JIT_DEBUG
+  clock_t cbegin, cend;
+#endif
 
 	if (!L) return 1;
 	if (!lua_getjit(L)) return 0;
@@ -194,6 +198,10 @@ int luaJ_create(lua_State* L, CallInfo *ci)
   /**
    * Make optimisations before compiling LUA
    */
+
+#ifdef JIT_DEBUG
+  cbegin = clock();
+#endif
   type_propagation(L, ci);
 
 	p->sizejit = get_jit_size(L, p);
@@ -217,7 +225,6 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 		return 1;
 	}
 
-
 #ifdef JIT_DEBUG
 	{
 		const char* s=p->source ? getstr(p->source) : "=?";
@@ -227,9 +234,11 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 			s="(bstring)";
 		else
 			s="(string)";
-		fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d)\n",
+    cend = clock();
+		fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d) in %.2f seconds\n",
 			p->linedefined==0?"main":"function", s,
-			p->linedefined,p->lastlinedefined, p->jit, p->sizejit);
+			p->linedefined,p->lastlinedefined, p->jit, p->sizejit,
+      1.0*(cend - cbegin)/CLOCKS_PER_SEC);
 	}
 #endif
 	luaJ_init_offset(ci);
