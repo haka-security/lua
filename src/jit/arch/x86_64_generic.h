@@ -24,7 +24,6 @@
  *  %rbx : L (Lua state) callee saved register
  *  %r12 : &savedpc
  *  %r13 : ci (Call Info) callee saved register
- *  %r14 : k (constant base) callee saved register
  *  %r15 : base (stack base) callee saved register
  *
  * ABI: %rdi, %rsi, %rdx, %rcx, %r8, %r9
@@ -34,10 +33,8 @@
  *  -16(%rbp): saved %rbx callee saved register
  *  -24(%rbp): saved %r12 callee saved register
  *  -32(%rbp): saved %r13 callee saved register
- *  -40(%rbp): saved %r14 callee saved register
- *  -48(%rbp): saved %r15 callee saved register
- *  -56(%rbp): jit code pointer
- *  -64(%rbp): jitoffset address
+ *  -40(%rbp): saved %r15 callee saved register
+ *  -48(%rbp): jitoffset address
  */
 
 #define NOP  APPEND1(0x90);
@@ -176,8 +173,8 @@
 	APPEND2(0xff, 0xd0); \
 
 #define JIT_UPDATEOFFSET(off) \
-	/* mov -64(%rbp), %rax*/ \
-	APPEND4(0x48, 0x8b, 0x45, 0xc0); \
+	/* mov -48(%rbp), %rax*/ \
+	APPEND4(0x48, 0x8b, 0x45, 0xd0); \
 	/* movl off, (%rax) */ \
 	APPEND2(0xc7, 0x00); \
 	APPEND(off, 4);
@@ -191,10 +188,8 @@
 	APPEND4(0x4c, 0x89, 0x65, 0xe8); \
 	/* mov %r13, -32(%rbp) */ \
 	APPEND4(0x4c, 0x89, 0x6d, 0xe0); \
-	/* mov %r14, -40(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x75, 0xd8); \
-	/* mov %r15, -48(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x7d, 0xd0);
+	/* mov %r15, -40(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x7d, 0xd8);
 
 #define RESTORE_REGISTERS \
 	/* mov -8(%rbp), %rax */ \
@@ -205,12 +200,10 @@
 	APPEND4(0x4c, 0x8b, 0x65, 0xe8); \
 	/* mov -32(%rbp), %r13 */ \
 	APPEND4(0x4c, 0x8b, 0x6d, 0xe0); \
-	/* mov -40(%rbp), %r14 */ \
-	APPEND4(0x4c, 0x8b, 0x75, 0xd8); \
-	/* mov -48(%rbp), %r15 */ \
-	APPEND4(0x4c, 0x8b, 0x7d, 0xd0);
+	/* mov -40(%rbp), %r15 */ \
+	APPEND4(0x4c, 0x8b, 0x7d, 0xd8);
 
-#define PROLOGUE_LEN 96
+#define PROLOGUE_LEN 72
 #define JIT_PROLOGUE \
 	APPEND4(0x55, 0x48, 0x89, 0xe5); /* push %rbp; mov %rsp,%rbp */ \
 	APPEND4(0x48, 0x83, 0xec, 80);    /* subq  $72,%rsp       */ \
@@ -220,8 +213,6 @@
 	APPEND3(0x48, 0x89, 0xfb); /* mov %rdi, %rbx */ \
 	/* put ci in r13 */ \
 	APPEND3(0x49, 0x89, 0xf5); \
-	/* put k in r14 */ \
-	APPEND3(0x49, 0x89, 0xce); /* mov %rcx, %r14 */ \
 	/* put base in r15 */ \
 	LUA_UPDATE_BASE; \
 	\
@@ -231,19 +222,11 @@
 	/* mov %rax, %r12 */ \
 	APPEND3(0x49, 0x89, 0xc4); \
 	\
-	/* put code in stack: -64(%rbp) */ \
-	/* mov offset8(%rdx), %r10 */ \
-	APPEND4(0x4c, 0x8b, 0x52, offsetof(LClosure, p)); \
-	/* mov offset8(%r10), %r10 */ \
-	APPEND4(0x4d, 0x8b, 0x52, offsetof(Proto, code)); \
-	/* mov %r10, -56(%rbp) */  \
-	APPEND4(0x4c, 0x89, 0x55, 0xc8); \
-	\
-	/* put &jitoffset in stack: -64(%rbp)  */ \
+	/* put &jitoffset in stack: -48(%rbp)  */ \
 	/* lea offset8(%r13),%rax */ \
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.jitoffset)); \
-	/* mov %rax,-64(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xc0); \
+	/* mov %rax,-48(%rbp) */ \
+	APPEND4(0x48, 0x89, 0x45, 0xd0); \
 	\
 	/* Prepare initial Jump for coroutine (%rax) is now jitoffset */ \
 	/* mov offset8(%rdx), %r10 */ \
@@ -253,7 +236,7 @@
 	APPEND(offsetof(Proto, jit), 4); \
 	/* add (%rax), %r10 */ \
 	APPEND3(0x4c, 0x03, 0x10); \
-  NOP7; \
+  NOP2; \
 	/* jmpq %r10 */ \
 	APPEND3(0x41, 0xff, 0xe2);
 
@@ -297,15 +280,15 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
   uint8_t *prog = bin;
   TValue *rb = p->k + GETARG_Bx(code[pc]);
   LUA_ADD_SAVEDPC(1);
-	/* Get RA in rax */ \
+	/* Get RA in rax */
   JIT_RABC(GETARG_A(code[pc]));
-  /* mov rb->_value, %r10 */ \
-  APPEND2(0x49, 0xba);\
-  APPEND((uint64_t)val_(rb).p, 8); \
-	/* mov %r10, (%rax) */ \
-	APPEND3(0x4c, 0x89, 0x10); \
-  /* movl rb->_tt, 0x8(%rax) */ \
-  APPEND3(0xc7, 0x40, 0x8);\
+  /* mov rb->_value, %r10 */
+  APPEND2(0x49, 0xba);
+  APPEND((uint64_t)val_(rb).p, 8);
+	/* mov %r10, (%rax) */
+	APPEND3(0x4c, 0x89, 0x10);
+  /* movl rb->_tt, 0x8(%rax) */
+  APPEND3(0xc7, 0x40, 0x8);
   APPEND(rttype(rb), 4);
   NOP3;
   return prog;
@@ -317,30 +300,27 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_loadkx_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 40;
 }
 
 static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
+  TValue *rax = p->k + GETARG_Ax(code[pc+1]);
+
 	LUA_ADD_SAVEDPC(2);
-	/* Get RA */
+	/* Get RA in rax */
 	JIT_RABC(GETARG_A(code[pc]));
-	/* mov r14, %rdx */
-	APPEND3(0x4c, 0x89, 0xf2);
-	/* add GETARG_Bx(i)*sizeof(TValue), %rdx */
-	APPEND3(0x48, 0x81, 0xc2);
-	APPEND(GETARG_Ax(code[pc+1])*sizeof(TValue), 4);
-	/* mov (%rdx), %r10 */
-	APPEND3(0x4c, 0x8b, 0x12);
-	/* mov %r10, (%rax) */
-	APPEND3(0x4c, 0x89, 0x10);
-	/* mov 0x08(%rdx), %r10d */
-	APPEND4(0x44, 0x8b, 0x52, 0x08);
-	/* mov %r10d, 0x8(%rax) */
-	APPEND4(0x44, 0x89, 0x50, 0x08);
-  NOP5;
+  /* mov rb->_value, %r10 */
+  APPEND2(0x49, 0xba);
+  APPEND((uint64_t)val_(rax).p, 8);
+  /* mov %r10, (%rax) */
+  APPEND3(0x4c, 0x89, 0x10);
+  /* movl rax->_tt, 0x8(%rax) */
+  APPEND3(0xc7, 0x40, 0x8);
+  APPEND(rttype(rax), 4);
+  NOP;
 	/* jump over the next instruction */
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
   return prog;
@@ -1100,7 +1080,7 @@ static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *co
 	/* jeq +offset8 */
 	APPEND2(X86_JE, 26);
 	RESTORE_REGISTERS;
-  NOP3;
+  NOP7;
 	/* leaveq; retq */
 	APPEND2(0xc9, 0xc3);
   return prog;
@@ -1111,7 +1091,7 @@ static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *co
  */
 static int op_return_size(Proto *p, const Instruction *code, unsigned int *addrs, int pc)
 {
-  return 88;
+  return 80;
 }
 static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
@@ -1131,7 +1111,7 @@ static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_return);
 	RESTORE_REGISTERS;
-  NOP7;
+  NOP3;
 	/* leaveq; retq */
 	APPEND2(0xc9, 0xc3);
   return prog;

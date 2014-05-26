@@ -205,15 +205,12 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
         }
         else {  /* Lua function */
 			CallInfo *nci = L->ci;
-		    LClosure *ncl;
-			TValue *nk;
-		    ncl = clLvalue(nci->func);
-			nk = ncl->p->k;
+		  LClosure *ncl = clLvalue(nci->func);
 			nci->callstatus |= CIST_REENTRY;
 			if (ncl->p->jit != NULL) {
-				void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
-					TValue *k) = (void *)ncl->p->jit;
-				return jitexecute(L, nci, ncl, nk);
+				void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+					(void *)ncl->p->jit;
+				return jitexecute(L, nci, ncl);
 			}
         }
 }
@@ -441,7 +438,6 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 	else {
 		int aux;
 		LClosure *ncl;
-		TValue *nk;
 
 		/* tail call: put called frame (n) in place of caller one (o) */
 		CallInfo *nci = L->ci;  /* called frame */
@@ -466,12 +462,11 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 		 */
 		nci = L->ci = oci;  /* remove new frame */
 		ncl = clLvalue(nci->func);
-		nk = ncl->p->k;
 		luaJ_init_offset(nci);
 		if (ncl->p->jit != NULL) {
-			void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
-				TValue *k) = (void *)ncl->p->jit;
-			jitexecute(L, nci, ncl, nk);
+			void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+				(void *)ncl->p->jit;
+			jitexecute(L, nci, ncl);
 		}
 	}
 	return 0;
