@@ -53,7 +53,7 @@ static inline uint8_t is_imm8(int value)
 #define APPEND3(b1, b2, b3)       APPEND2(b1,b2);APPEND1(b3)
 #define APPEND4(b1, b2, b3, b4)   APPEND((b1) + ((b2) << 8) + ((b3) << 16) + ((b4) << 24), 4)
 
-int luaJ_create(lua_State* L, CallInfo *ci);
+int luaJ_create(lua_State* L, StkId func);
 void luaJ_init_offset(CallInfo *ci);
 /* VM functions */
 void vm_setobj(lua_State* L, TValue *a, TValue *b);

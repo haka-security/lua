@@ -47,7 +47,7 @@ static int get_jit_size(lua_State *L, Proto *p)
 	return len;
 }
 
-static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
+static int get_jit(lua_State* L, Proto *p)
 {
 	uint8_t *prog;
 	int pc, proglen;
@@ -103,68 +103,7 @@ static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
 	return 0;
 }
 
-static int type_propagation(lua_State* L, CallInfo *ci)
-{
-  LClosure *cl = clLvalue(ci->func);
-  Proto *p = cl->p;
-  const Instruction* code = p->code;
-  int pc;
-  TValue *k = p->k;
-
-  p->stypes = luaM_malloc(L, p->maxstacksize*sizeof(StackTypes));
-  for (pc = 0; pc < p->maxstacksize; pc++) {
-    p->stypes[pc].types = 0;
-    p->stypes[pc].sizetypes = 0;
-  }
-
-  for (pc = 0; pc < p->sizecode; pc++)  {
-    Instruction i = code[pc];
-    OpCode o=GET_OPCODE(i);
-    int a=GETARG_A(i);
-    int b=GETARG_B(i);
-    //int c=GETARG_C(i);
-    int ax=GETARG_Ax(i);
-    int bx=GETARG_Bx(i);
-    //int sbx=GETARG_sBx(i);
-
-    switch(o) {
-      TValue* v;
-      case OP_LOADK:
-        v = k + bx;
-        if (!(p->stypes[a].types & (1 << ttypenv(v)))) {
-          p->stypes[a].sizetypes++;
-          p->stypes[a].types |= (1 << ttypenv(v));
-        }
-        break;
-      case OP_LOADKX:
-        i = code[++pc]; ax = GETARG_Ax(i);
-        v = k + ax;
-        if (!(p->stypes[a].types & (1 << ttypenv(v)))) {
-          p->stypes[a].sizetypes++;
-          p->stypes[a].types |= (1 << ttypenv(v));
-        }
-        break;
-      case OP_MOVE:
-        if (!(p->stypes[a].types & p->stypes[b].types)) {
-          p->stypes[a].sizetypes++;
-          p->stypes[a].types |= p->stypes[b].types;
-        }
-        break;
-      case OP_GETUPVAL:
-        v = cl->upvals[b]->v;
-        if (!(p->stypes[a].types & (1 << ttypenv(v)))) {
-          p->stypes[a].sizetypes++;
-          p->stypes[a].types |= (1 << ttypenv(v));
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  return 0;
-}
-
-int luaJ_create(lua_State* L, CallInfo *ci)
+int luaJ_create(lua_State* L, StkId func)
 {
 	Proto *p;
 	const char* s;
@@ -176,7 +115,7 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 	if (!lua_getjit(L)) return 0;
 
 
-	p = clLvalue(ci->func)->p;
+	p = clLvalue(func)->p;
 	if (!p) {
 		luaG_runerror(L, "luaJ_create: cannot get function to jit\n");
 		return 1;
@@ -191,7 +130,6 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 		s="(string)";
 
 	if (p->sizejit && p->jit) {
-		luaJ_init_offset(ci);
 		return 0;
 	}
 
@@ -202,7 +140,6 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 #ifdef JIT_DEBUG
   cbegin = clock();
 #endif
-  type_propagation(L, ci);
 
 	p->sizejit = get_jit_size(L, p);
 	if (!p->sizejit) {
@@ -218,7 +155,7 @@ int luaJ_create(lua_State* L, CallInfo *ci)
 		return 1;
 	}
 
-	if (get_jit(L, ci, p) != 0) {
+	if (get_jit(L, p) != 0) {
 		jit_free(p);
 		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
 				p->sizejit, s, p->linedefined, p->lastlinedefined);
@@ -241,7 +178,6 @@ int luaJ_create(lua_State* L, CallInfo *ci)
       1.0*(cend - cbegin)/CLOCKS_PER_SEC);
 	}
 #endif
-	luaJ_init_offset(ci);
 	return 0;
 }
 
