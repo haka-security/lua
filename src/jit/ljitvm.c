@@ -219,17 +219,17 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
 void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
 {
 	LClosure *cl = clLvalue(ci->func);
-    Proto *p = cl->p->p[bx];
-    Closure *ncl = getcached(p, cl->upvals, base);  /* cached closure */
+  Proto *p = cl->p->p[bx];
+  Closure *ncl = getcached(p, cl->upvals, base);  /* cached closure */
 
-    if (ncl == NULL)  /* no match? */
-      pushclosure(L, p, cl->upvals, base, ra);  /* create a new one */
-    else
-      setclLvalue(L, ra, ncl);  /* push cashed closure */
+  if (ncl == NULL)  /* no match? */
+    pushclosure(L, p, cl->upvals, base, ra);  /* create a new one */
+  else
+    setclLvalue(L, ra, ncl);  /* push cashed closure */
 	luaC_condGC(L,{L->top = ra+1;  /* limit of live values */ \
                    luaC_step(L); \
                    L->top = ci->top;})  /* restore top */ \
-    luai_threadyield(L);
+  luai_threadyield(L);
 }
 
 int vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)

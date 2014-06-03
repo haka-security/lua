@@ -184,11 +184,23 @@ static inline int jit_add_remove(lua_State *L, int state)
   int i, n = lua_gettop(L);
   Proto *p;
 
-  for (i = 1; i <= n; i++) {
-    p = lua_tolfunction(L, i);
-    if (p) {
-      if (state) luaJ_create(L, p);
-      else jit_free(p);
+  if (n == 0) {
+    CallInfo *ci = L->ci->previous;
+    if (ci && ttisLclosure(ci->func)) {
+      Proto *p = clLvalue(ci->func)->p;
+      for (i = 0; i < p->sizep; i++) {
+        if (state) luaJ_create(L, p->p[i]);
+        else jit_free(p->p[i]);
+      }
+    }
+  }
+  else {
+    for (i = 1; i <= n; i++) {
+      p = lua_tolfunction(L, i);
+      if (p) {
+        if (state) luaJ_create(L, p);
+        else jit_free(p);
+      }
     }
   }
   return 0;
