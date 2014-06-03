@@ -542,6 +542,7 @@ void luaV_execute (lua_State *L) {
   base = ci->u.l.base;
 #ifdef LUA_USE_JIT
   if (cl->p->jit != NULL) {
+    cl->p->called++;
 		int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
               (void *)cl->p->jit;
 		if (jitexecute(L, ci, cl)) {

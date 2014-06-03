@@ -106,70 +106,36 @@ static int get_jit(lua_State* L, Proto *p)
 
 int luaJ_create(lua_State* L, Proto *p)
 {
-	const char* s;
-#ifdef JIT_DEBUG
-  clock_t cbegin, cend;
-#endif
-
 	if (!L || !p) return 1;
-
-	s = p->source ? getstr(p->source) : "=?";
-	if (*s=='@' || *s=='=')
-		s++;
-	else if (*s==LUA_SIGNATURE[0])
-		s="(bstring)";
-	else
-		s="(string)";
 
 	if (p->sizejit && p->jit) {
 		return 0;
 	}
 
-  /**
-   * Make optimisations before compiling LUA
-   */
-
-#ifdef JIT_DEBUG
-  cbegin = clock();
-#endif
-
+  p->called = 0;
 	p->sizejit = get_jit_size(L, p);
 	if (!p->sizejit) {
 		luaG_runerror(L, "luaJ_create: cannot get jit size for %s (from %d to %d)\n",
-				s, p->linedefined, p->lastlinedefined);
+				p->source ? getstr(p->source) : "?", p->linedefined,
+        p->lastlinedefined);
 		p->jit = NULL;
 		return 1;
 	}
 
 	if (jit_alloc(p) == 1) {
 		luaG_runerror(L, "luaJ_create: cannot alloc memory (%d bytes) for %s (from %d to %d)\n",
-				p->sizejit, s, p->linedefined, p->lastlinedefined);
+				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
+        p->lastlinedefined);
 		return 1;
 	}
 
 	if (get_jit(L, p) != 0) {
 		jit_free(p);
 		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
-				p->sizejit, s, p->linedefined, p->lastlinedefined);
+				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
+        p->lastlinedefined);
 		return 1;
 	}
-
-#ifdef JIT_DEBUG
-	{
-		const char* s=p->source ? getstr(p->source) : "=?";
-		if (*s=='@' || *s=='=')
-			s++;
-		else if (*s==LUA_SIGNATURE[0])
-			s="(bstring)";
-		else
-			s="(string)";
-    cend = clock();
-		fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d) in %.2f seconds\n",
-			p->linedefined==0?"main":"function", s,
-			p->linedefined,p->lastlinedefined, p->jit, p->sizejit,
-      1.0*(cend - cbegin)/CLOCKS_PER_SEC);
-	}
-#endif
 	return 0;
 }
 
@@ -177,6 +143,19 @@ void luaJ_init_offset(CallInfo *ci)
 {
 	/* Create initial offset for jmpq in prologu */
 	ci->u.l.jitoffset = PROLOGUE_LEN;
+}
+
+/**
+ * Jit Add/Remove functions
+ */
+static inline void jit_set_proto(lua_State *L, Proto *p, int state)
+{
+  int i;
+  if (state) luaJ_create(L, p);
+  else jit_free(p);
+  for(i = 0; i < p->sizep; i++) {
+    jit_set_proto(L, p->p[i], state);
+  }
 }
 
 static inline int jit_add_remove(lua_State *L, int state)
@@ -189,8 +168,7 @@ static inline int jit_add_remove(lua_State *L, int state)
     if (ci && ttisLclosure(ci->func)) {
       Proto *p = clLvalue(ci->func)->p;
       for (i = 0; i < p->sizep; i++) {
-        if (state) luaJ_create(L, p->p[i]);
-        else jit_free(p->p[i]);
+        jit_set_proto(L, p->p[i], state);
       }
     }
   }
@@ -198,8 +176,7 @@ static inline int jit_add_remove(lua_State *L, int state)
     for (i = 1; i <= n; i++) {
       p = lua_tolfunction(L, i);
       if (p) {
-        if (state) luaJ_create(L, p);
-        else jit_free(p);
+        jit_set_proto(L, p, state);
       }
     }
   }
@@ -216,9 +193,55 @@ static int jit_remove(lua_State *L)
   return jit_add_remove(L, 0);
 }
 
+/**
+ * Jit statistics functions
+ */
+static inline void jit_print_proto(lua_State *L, Proto *p, int level)
+{
+  int i;
+  const char* s = p->source ? getstr(p->source) : "?";
+
+  for (i = 0; i < level; i++) {
+    fprintf(stderr, "  ");
+  }
+  if (p->jit != NULL) {
+    fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d) called %d times\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
+  }
+
+  for(i = 0; i < p->sizep; i++) {
+    jit_print_proto(L, p->p[i], level+1);
+  }
+}
+
+static int jit_stats(lua_State *L)
+{
+  int i, n = lua_gettop(L);
+  Proto *p;
+
+  if (n == 0) {
+    CallInfo *ci = L->ci->previous;
+    if (ci && ttisLclosure(ci->func)) {
+      Proto *p = clLvalue(ci->func)->p;
+      jit_print_proto(L, p, 0);
+    }
+  }
+  else {
+    for (i = 1; i <= n; i++) {
+      p = lua_tolfunction(L, i);
+      if (p) {
+        jit_print_proto(L, p, 0);
+      }
+    }
+  }
+  return 0;
+}
+
 static const luaL_Reg jitlib[] = {
   {"add", jit_add},
   {"remove", jit_remove},
+  {"stats", jit_stats},
   {NULL, NULL}
 };
 

@@ -208,6 +208,7 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
     L->ci->callstatus |= CIST_REENTRY;
     if (!ncl->p->jit) luaJ_create(L, ncl->p);
     if (ncl->p->jit != NULL) {
+      ncl->p->called++;
       int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
           (void *)ncl->p->jit;
 		  jitexecute(L, L->ci, ncl);
@@ -464,6 +465,7 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 		luaJ_init_offset(nci);
     if (!ncl->p->jit) luaJ_create(L, ncl->p);
 		if (ncl->p->jit != NULL) {
+      ncl->p->called++;
 			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
 				(void *)ncl->p->jit;
 			jitexecute(L, nci, ncl);
