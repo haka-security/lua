@@ -541,10 +541,16 @@ void luaV_execute (lua_State *L) {
   k = cl->p->k;
   base = ci->u.l.base;
 #ifdef LUA_USE_JIT
-  if (lua_getjit(L) && cl->p->jit != NULL) {
-		void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+  if (cl->p->jit != NULL) {
+		int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
               (void *)cl->p->jit;
-		return jitexecute(L, ci, cl);
+		if (jitexecute(L, ci, cl)) {
+      ci = L->ci;
+      goto newframe;
+    }
+    else {
+      return;
+    }
   }
 #endif
   /* main loop of interpreter */

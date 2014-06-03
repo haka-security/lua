@@ -139,21 +139,6 @@ LUA_API const lua_Number *lua_version (lua_State *L) {
   if (L == NULL) return &version;
   else return G(L)->version;
 }
-#ifdef LUA_USE_JIT
-LUA_API void lua_setjit(lua_State *L, int jitenable)
-{
-  if (L == NULL) return;
-  else {
-    G(L)->jitenable = jitenable;
-  }
-}
-
-LUA_API int lua_getjit(lua_State *L)
-{
-  if (L == NULL) return 0;
-  else return G(L)->jitenable;
-}
-#endif
 
 /*
 ** basic stack manipulation
@@ -435,6 +420,14 @@ LUA_API lua_CFunction lua_tocfunction (lua_State *L, int idx) {
     return clCvalue(o)->f;
   else return NULL;  /* not a C function */
 }
+
+LUA_API struct Proto *lua_tolfunction (lua_State *L, int idx) {
+  StkId o = index2addr(L, idx);
+  if (ttisLclosure(o))
+    return clLvalue(o)->p;
+  else return NULL;  /* not a C function */
+}
+
 
 
 LUA_API void *lua_touserdata (lua_State *L, int idx) {

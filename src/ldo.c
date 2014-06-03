@@ -352,9 +352,7 @@ int luaD_precall (lua_State *L, StkId func, int nresults) {
       if (L->hookmask & LUA_MASKCALL)
         callhook(L, ci);
 #ifdef LUA_USE_JIT
-	  if (!luaJ_create(L, func)) {
       luaJ_init_offset(ci);
-    }
 #endif
       return 0;
     }

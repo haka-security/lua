@@ -197,22 +197,23 @@ void vm_settabup(lua_State* L, int a, TValue *rkb, TValue *rkc)
 
 void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
 {
-        int nresults = c - 1;
+  int nresults = c - 1;
 
-        if (b != 0) L->top = ra+b;  /* else previous instruction set top */
-        if (luaD_precall(L, ra, nresults)) {  /* C function? */
-          if (nresults >= 0) L->top = ci->top;  /* adjust results */
-        }
-        else {  /* Lua function */
-			CallInfo *nci = L->ci;
-		  LClosure *ncl = clLvalue(nci->func);
-			nci->callstatus |= CIST_REENTRY;
-			if (ncl->p->jit != NULL) {
-				void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
-					(void *)ncl->p->jit;
-				return jitexecute(L, nci, ncl);
-			}
-        }
+  if (b != 0) L->top = ra+b;  /* else previous instruction set top */
+  if (luaD_precall(L, ra, nresults)) {  /* C function? */
+    if (nresults >= 0) L->top = ci->top;  /* adjust results */
+  }
+  else {  /* Lua function */
+    LClosure *ncl = clLvalue(L->ci->func);
+    L->ci->callstatus |= CIST_REENTRY;
+    if (!ncl->p->jit) luaJ_create(L, ncl->p);
+    if (ncl->p->jit != NULL) {
+      int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+          (void *)ncl->p->jit;
+		  jitexecute(L, L->ci, ncl);
+      return;
+    }
+  }
 }
 
 void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
@@ -231,9 +232,8 @@ void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
     luai_threadyield(L);
 }
 
-void vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)
+int vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)
 {
-	CallInfo *nci;
 	int nb = 0;
 	LClosure *cl = clLvalue(ci->func);
 
@@ -241,14 +241,13 @@ void vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)
 	if (cl->p->sizep > 0) luaF_close(L, base);
 	nb = luaD_poscall(L, ra);
 	if (!(ci->callstatus & CIST_REENTRY)) { /* 'ci' still the called one */
-		return;  /* external invocation: return */
+		return 0;  /* external invocation: return */
 	}
 	else {  /* invocation via reentry: continue execution */
-		nci = L->ci;
-		if (nb) L->top = nci->top;
-		lua_assert(isLua(nci));
-		lua_assert(GET_OPCODE(*((nci)->u.l.savedpc - 1)) == OP_CALL);
-		return;
+		if (nb) L->top = L->ci->top;
+		lua_assert(isLua(L->ci));
+		lua_assert(GET_OPCODE(*((L->ci)->u.l.savedpc - 1)) == OP_CALL);
+		return 1;
 	}
 }
 
@@ -463,8 +462,9 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 		nci = L->ci = oci;  /* remove new frame */
 		ncl = clLvalue(nci->func);
 		luaJ_init_offset(nci);
+    if (!ncl->p->jit) luaJ_create(L, ncl->p);
 		if (ncl->p->jit != NULL) {
-			void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
 				(void *)ncl->p->jit;
 			jitexecute(L, nci, ncl);
 		}

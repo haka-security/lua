@@ -53,7 +53,7 @@ static inline uint8_t is_imm8(int value)
 #define APPEND3(b1, b2, b3)       APPEND2(b1,b2);APPEND1(b3)
 #define APPEND4(b1, b2, b3, b4)   APPEND((b1) + ((b2) << 8) + ((b3) << 16) + ((b4) << 24), 4)
 
-int luaJ_create(lua_State* L, StkId func);
+int luaJ_create(lua_State* L, Proto *p);
 void luaJ_init_offset(CallInfo *ci);
 /* VM functions */
 void vm_setobj(lua_State* L, TValue *a, TValue *b);
@@ -68,7 +68,7 @@ void vm_gettabup(lua_State* L, int b, TValue *rkc, TValue *ra);
 void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci);
 void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx);
 void vm_settabup(lua_State* L, int a, TValue *rkb, TValue *rkc);
-void vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b);
+int vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b);
 void vm_jumpclose(lua_State* L, CallInfo *ci, int a);
 void vm_newtable(lua_State* L, CallInfo *ci, TValue *ra, int b, int c);
 void vm_setupval(lua_State* L, TValue *ra, int b);

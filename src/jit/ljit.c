@@ -16,6 +16,7 @@
 #include "../lopcodes.h"
 #include "../lstate.h"
 #include "../lvm.h"
+#include "../lauxlib.h"
 #include "ljit.h"
 
 #if defined LUA_USE_JIT_LINUX_X86_64
@@ -103,23 +104,14 @@ static int get_jit(lua_State* L, Proto *p)
 	return 0;
 }
 
-int luaJ_create(lua_State* L, StkId func)
+int luaJ_create(lua_State* L, Proto *p)
 {
-	Proto *p;
 	const char* s;
 #ifdef JIT_DEBUG
   clock_t cbegin, cend;
 #endif
 
-	if (!L) return 1;
-	if (!lua_getjit(L)) return 0;
-
-
-	p = clLvalue(func)->p;
-	if (!p) {
-		luaG_runerror(L, "luaJ_create: cannot get function to jit\n");
-		return 1;
-	}
+	if (!L || !p) return 1;
 
 	s = p->source ? getstr(p->source) : "=?";
 	if (*s=='@' || *s=='=')
@@ -186,3 +178,40 @@ void luaJ_init_offset(CallInfo *ci)
 	/* Create initial offset for jmpq in prologu */
 	ci->u.l.jitoffset = PROLOGUE_LEN;
 }
+
+static inline int jit_add_remove(lua_State *L, int state)
+{
+  int i, n = lua_gettop(L);
+  Proto *p;
+
+  for (i = 1; i <= n; i++) {
+    p = lua_tolfunction(L, i);
+    if (p) {
+      if (state) luaJ_create(L, p);
+      else jit_free(p);
+    }
+  }
+  return 0;
+}
+
+static int jit_add(lua_State *L)
+{
+  return jit_add_remove(L, 1);
+}
+
+static int jit_remove(lua_State *L)
+{
+  return jit_add_remove(L, 0);
+}
+
+static const luaL_Reg jitlib[] = {
+  {"add", jit_add},
+  {"remove", jit_remove},
+  {NULL, NULL}
+};
+
+LUAMOD_API int luaopen_jit (lua_State *L) {
+  luaL_newlib(L, jitlib);
+  return 1;
+}
+
