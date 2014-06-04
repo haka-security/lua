@@ -89,5 +89,4 @@ void vm_setconcat(lua_State* L, CallInfo *ci, TValue *ra, TValue *rb);
 void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b);
 int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b);
 int vm_testset(lua_State* L, TValue *ra, TValue *rb, int c);
-void PrintJitValue(TValue* o);
 #endif

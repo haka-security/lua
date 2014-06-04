@@ -28,60 +28,6 @@
 #define luai_runtimecheck(L, c)		/* void */
 #endif
 
-static void PrintJitString(const TString* ts)
-{
- const char* s=getstr(ts);
- size_t i,n=ts->tsv.len;
- printf("%c",'"');
- for (i=0; i<n; i++)
- {
-  int c=(int)(unsigned char)s[i];
-  switch (c)
-  {
-   case '"':  printf("\\\""); break;
-   case '\\': printf("\\\\"); break;
-   case '\a': printf("\\a"); break;
-   case '\b': printf("\\b"); break;
-   case '\f': printf("\\f"); break;
-   case '\n': printf("\\n"); break;
-   case '\r': printf("\\r"); break;
-   case '\t': printf("\\t"); break;
-   case '\v': printf("\\v"); break;
-   default:	if (isprint(c))
-   			printf("%c",c);
-		else
-			printf("\\%03d",c);
-  }
- }
- printf("%c",'"');
-}
-
-
-void PrintJitValue(TValue* o)
-{
- switch (ttype(o))
- {
-  case LUA_TNIL:
-    printf("nil");
-    break;
-  case LUA_TBOOLEAN:
-    printf(bvalue(o) ? "true" : "false");
-    break;
-  case LUA_TNUMBER:
-    printf(LUA_NUMBER_FMT,nvalue(o));
-    break;
-  case LUA_TSTRING:
-    PrintJitString(rawtsvalue(o));
-    break;
-  case LUA_TTABLE:
-	printf("Table");
-	break;
-  default:              /* cannot happen */
-    printf("? type=%d",ttype(o));
-    break;
- }
-}
-
 void vm_setobj(lua_State* L, TValue *a, TValue *b)
 {
 	a->value_ = b->value_;
@@ -205,15 +151,18 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
   }
   else {  /* Lua function */
     LClosure *ncl = clLvalue(L->ci->func);
-    L->ci->callstatus |= CIST_REENTRY;
-    if (!ncl->p->jit) luaJ_create(L, ncl->p);
+//    if (!ncl->p->jit) luaJ_create(L, ncl->p);
     if (ncl->p->jit != NULL) {
       unsigned int offset = L->ci->u.l.savedpc - ncl->p->code;
       ncl->p->called++;
+      L->ci->callstatus |= CIST_REENTRY;
       int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
           (void *)ncl->p->jit;
 		  jitexecute(L, L->ci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
       return;
+    }
+    else {
+      luaV_execute(L);
     }
   }
 }
@@ -466,12 +415,14 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
     if (!ncl->p->jit) luaJ_create(L, ncl->p);
 		if (ncl->p->jit != NULL) {
       unsigned int offset = nci->u.l.savedpc - ncl->p->code;
-      printf("vm_tailcall: offset: %d\n", ncl->p->addrs[offset]);
       ncl->p->called++;
 			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
 				(void *)ncl->p->jit;
 			jitexecute(L, nci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
 		}
+    else {
+      luaV_execute(L);
+    }
 	}
 	return 0;
 }
