@@ -160,10 +160,16 @@
     APPEND((arg)*sizeof(TValue), 4);\
 }
 
+/**
+ * Update base stack if needed
+ */
 #define LUA_UPDATE_BASE \
 	/* mov offset8(%r13),%r15 */ \
 	APPEND4(0x4d, 0x8b, 0x7d, offsetof(CallInfo, u.l.base));
 
+/**
+ * Increment savedpc used in lvm.c
+ */
 #define LUA_ADD_SAVEDPC(arg) \
 	/* addq arg*sizeof(Instrcution) (%r12) */ \
 	APPEND4(0x49, 0x81, 0x04, 0x24); \
