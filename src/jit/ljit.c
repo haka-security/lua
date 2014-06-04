@@ -95,7 +95,6 @@ static int get_jit(lua_State* L, Proto *p)
 		Instruction i = code[pc];
     int jitcodesz = generator[GET_OPCODE(i)].size(p, code, NULL, pc);
 
-    p->opcodes[GET_OPCODE(i)]++;
     if (generator[GET_OPCODE(i)].create != NULL) {
       prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
     }
@@ -206,6 +205,7 @@ static int jit_remove(lua_State *L)
 static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
 {
   int i, sz;
+  unsigned long total = 0;
   const char* s = p->source ? getstr(p->source) : "?";
   char *r = luaL_prepbuffer(b);
 
@@ -219,8 +219,12 @@ static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
         r = luaL_prepbuffer(b);
         sz = sprintf(r, "  %s: %d\n", luaP_opnames[i], p->opcodes[i]);
         luaL_addsize(b, sz);
+        total+= p->opcodes[i];
       }
     }
+    r = luaL_prepbuffer(b);
+    sz = sprintf(r, "  Total: %lu\n", total);
+    luaL_addsize(b, sz);
   }
 
   for(i = 0; i < p->sizep; i++) {

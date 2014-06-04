@@ -175,6 +175,16 @@
 	APPEND4(0x49, 0x81, 0x04, 0x24); \
 	APPEND((arg)*sizeof(Instruction), 4);
 
+/**
+ * Increment lua opcode count, used by stats
+ */
+#define LUA_INC_OPCODE \
+  /* mov &p->opcodes[GET_OPCODE(code[pc])),%rax */ \
+  APPEND2(0x48, 0xb8); \
+  APPEND((uint64_t)&p->opcodes[GET_OPCODE(code[pc])], 8); \
+  /* incl (%rax) */ \
+  APPEND2(0xff, 0x00);
+
 #define VM_CALL(func) \
 	/* mov func, %rax */ \
 	APPEND2(0x48, 0xb8); \
@@ -230,13 +240,14 @@
 static inline int op_move_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 52;
 }
 static inline uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	RABC_RSI(GETARG_A(code[pc]));
 	RABC_RDX(GETARG_B(code[pc]));
 	/* mov (%rdx), %rax */
@@ -256,7 +267,7 @@ static inline uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction 
 static int op_loadk_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 49;
 }
 static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
@@ -264,6 +275,7 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
   uint8_t *prog = bin;
   TValue *rb = p->k + GETARG_Bx(code[pc]);
   LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* Get RA in rax */
   JIT_RABC(GETARG_A(code[pc]));
   /* mov rb->_value, %r10 */
@@ -274,7 +286,6 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
   /* movl rb->_tt, 0x8(%rax) */
   APPEND3(0xc7, 0x40, 0x8);
   APPEND(rttype(rb), 4);
-  NOP3;
   return prog;
 }
 
@@ -284,7 +295,7 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_loadkx_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 51;
 }
 
 static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code,
@@ -294,6 +305,7 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
   TValue *rax = p->k + GETARG_Ax(code[pc+1]);
 
 	LUA_ADD_SAVEDPC(2);
+  LUA_INC_OPCODE;
 	/* Get RA in rax */
 	JIT_RABC(GETARG_A(code[pc]));
   /* mov rb->_value, %r10 */
@@ -304,7 +316,6 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
   /* movl rax->_tt, 0x8(%rax) */
   APPEND3(0xc7, 0x40, 0x8);
   APPEND(rttype(rax), 4);
-  NOP;
 	/* jump over the next instruction */
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
   return prog;
@@ -316,12 +327,13 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
 static inline int op_loadbool_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 46;
 }
 static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
+  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
 	/* mov GETARG_B(i), %esi */
 	APPEND1(0xbe);
@@ -339,7 +351,6 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
 		LUA_ADD_SAVEDPC(1);
     NOP2;
 	}
-  NOP6;
   return prog;
 }
 
@@ -349,7 +360,7 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
 static int op_loadnil_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 24 + (16 * (GETARG_B(code[pc]) + 1));
+  return 34 + (11 * (GETARG_B(code[pc]) + 1));
 }
 static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
@@ -358,6 +369,7 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
   int b = GETARG_B(code[pc]);
 
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
   NOP6;
   do {
@@ -366,7 +378,6 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
     APPEND(0x0, 4);
     /* add sizeof(TValue), %rdi */
     APPEND4(0x48, 0x83, 0xc7, sizeof(TValue));
-    NOP5;
   } while(b--);
   return prog;
 }
@@ -377,13 +388,14 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_getupval_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 50;
 }
 static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -391,7 +403,6 @@ static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND1(0xba);
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_getupval);
-  NOP2;
   return prog;
 }
 
@@ -401,13 +412,14 @@ static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_gettabup_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 64;
 }
 static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov GETARG_B(i), %esi */
@@ -415,7 +427,6 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND(GETARG_B(code[pc]), 4);
 	RKBC_RDX(GETARG_C(code[pc]), p);
 	RABC_RCX(GETARG_A(code[pc]));
-  NOP4;
 	VM_CALL(vm_gettabup);
 	/* vm_gettabup can realloc base, reset it */
 	LUA_UPDATE_BASE;
@@ -428,13 +439,14 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_gettable_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 69;
 }
 static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_B(code[pc]));
@@ -443,7 +455,6 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
 	VM_CALL(luaV_gettable);
 	/* luaV_gettable can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -453,13 +464,14 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_settabup_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 64;
 }
 static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov GETARG_A(i), %esi */
@@ -470,7 +482,6 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	VM_CALL(vm_settabup);
 	/* vm_settabup can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP4;
   return prog;
 }
 
@@ -480,13 +491,14 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_setupval_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 50;
 }
 static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -494,7 +506,6 @@ static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND1(0xba);
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_setupval);
-  NOP2;
   return prog;
 }
 
@@ -504,13 +515,14 @@ static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_settable_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 69;
 }
 static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -518,7 +530,6 @@ static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *co
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_settable);
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -528,13 +539,14 @@ static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_newtable_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 63;
 }
 static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -548,7 +560,6 @@ static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_newtable);
 	LUA_UPDATE_BASE;
-  NOP5;
   return prog;
 }
 
@@ -558,13 +569,14 @@ static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_self_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 69;
 }
 static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -572,7 +584,6 @@ static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_self);
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -582,13 +593,14 @@ static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_add_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 96;
+  return 108;
 }
 static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -631,13 +643,14 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_sub_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 96;
+  return 108;
 }
 static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -680,13 +693,14 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_mul_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 96;
+  return 108;
 }
 static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -729,13 +743,14 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_div_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 96;
+  return 108;
 }
 static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -778,13 +793,14 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_mod_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 69;
 }
 static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -795,7 +811,6 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
 	VM_CALL(vm_mod);
 	/* vm_mod can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -805,13 +820,14 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_pow_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 69;
 }
 static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -822,7 +838,6 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
 	VM_CALL(vm_pow);
 	/* vm_mod can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -832,13 +847,14 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_unm_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 59;
 }
 static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1); \
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */ \
 	APPEND3(0x48, 0x89, 0xdf); \
 	RABC_RSI(GETARG_A(code[pc])); \
@@ -847,7 +863,6 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
 	VM_CALL(vm_unm); \
 	/* vm_unm can realloc base, reset it */ \
 	LUA_UPDATE_BASE;
-  NOP;
   return prog;
 }
 
@@ -857,13 +872,14 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_not_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 52;
 }
 static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1); \
+  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc])); \
 	RABC_RSI(GETARG_B(code[pc])); \
 	VM_CALL(vm_not);
@@ -876,13 +892,14 @@ static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_len_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 59;
 }
 static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -890,7 +907,6 @@ static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
 	VM_CALL(luaV_objlen);
 	/* luaV_objlen can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP;
   return prog;
 }
 
@@ -900,13 +916,14 @@ static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_concat_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 88;
+  return 94;
 }
 static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r15, %rsi */
@@ -927,7 +944,6 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
 	RABC_RCX(GETARG_B(code[pc]));
 	VM_CALL(vm_setconcat);
 	LUA_UPDATE_BASE;
-  NOP6;
   return prog;
 }
 
@@ -937,14 +953,14 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
 static int op_jmp_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 48;
 }
 static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-  NOP4;
 	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -964,13 +980,14 @@ static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_eq_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 76;
 }
 static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
@@ -992,13 +1009,14 @@ static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_lt_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 76;
 }
 static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
@@ -1020,13 +1038,14 @@ static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_le_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 64;
+  return 76;
 }
 static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
@@ -1048,13 +1067,14 @@ static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_test_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 62;
 }
 static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
 	/* mov GETARG_C(i), %esi */
 	APPEND1(0xbe);
@@ -1065,7 +1085,6 @@ static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND2(X86_JNE, 10);
 	LUA_ADD_SAVEDPC(1);
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
-  NOP6;
   return prog;
 }
 
@@ -1075,12 +1094,14 @@ static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_testset_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 60;
 }
 static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
+	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -1098,13 +1119,14 @@ static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_call_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 62;
 }
 static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */ \
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -1119,7 +1141,6 @@ static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
 	VM_CALL(vm_call);
 	/* vm_call can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP6;
   return prog;
 }
 
@@ -1129,13 +1150,14 @@ static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
 static int op_tailcall_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 72;
+  return 84;
 }
 static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1168,13 +1190,14 @@ static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *co
  */
 static int op_return_size(Proto *p, const Instruction *code, unsigned int *addrs, int pc)
 {
-  return 64;
+  return 75;
 }
 static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r15, %rsi */
@@ -1187,7 +1210,6 @@ static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_return);
 	RESTORE_REGISTERS;
-  NOP;
 	/* leaveq; retq */
 	APPEND2(0xc9, 0xc3);
   return prog;
@@ -1199,14 +1221,14 @@ static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code
 static int op_forloop_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 54;
 }
 static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  NOP6;
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -1225,14 +1247,14 @@ static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_forprep_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 40;
+  return 50;
 }
 static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  NOP2;
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -1248,13 +1270,14 @@ static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_tforcall_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 57;
 }
 static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1265,7 +1288,6 @@ static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_tforcall);
 	LUA_UPDATE_BASE;
-  NOP3;
   return prog;
 }
 
@@ -1275,14 +1297,14 @@ static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_tforloop_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 54;
 }
 static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  NOP6;
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -1300,12 +1322,13 @@ static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *co
 static int op_setlist_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 67;
 }
 static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1321,7 +1344,6 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
 	APPEND2(0x41, 0xb9);
 	APPEND(GETARG_Ax(code[pc+1]), 4);
 	VM_CALL(vm_setlist);
-  NOP;
 	if (GET_OPCODE(code[pc+1]) == OP_EXTRAARG) {
 		/* jump over OP_EXTRAARG */
 		LUA_ADD_SAVEDPC(2);
@@ -1340,13 +1362,14 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_closure_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 56;
+  return 61;
 }
 static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r15, %rsi */
@@ -1360,7 +1383,6 @@ static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *cod
 	VM_CALL(vm_closure);
 	/* vm_closure can realloc base, reset it */
 	LUA_UPDATE_BASE;
-  NOP7;
   return prog;
 }
 
@@ -1370,14 +1392,14 @@ static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *cod
 static int op_vararg_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 48;
+  return 56;
 }
 static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
-  NOP4;
+  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1402,13 +1424,13 @@ static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code
 static int op_extraarg_size(Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
-  return 8;
+  return 1;
 }
 static uint8_t *op_extraarg_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-  NOP8;
+  NOP;
   return prog;
 }
 
