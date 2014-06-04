@@ -77,7 +77,6 @@ typedef struct CallInfo {
     struct {  /* only for Lua functions */
       StkId base;  /* base for this function */
       const Instruction *savedpc;
-      ptrdiff_t jitoffset;
     } l;
     struct {  /* only for C functions */
       int ctx;  /* context info. in case of yields */

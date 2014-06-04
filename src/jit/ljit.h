@@ -54,7 +54,7 @@ static inline uint8_t is_imm8(int value)
 #define APPEND4(b1, b2, b3, b4)   APPEND((b1) + ((b2) << 8) + ((b3) << 16) + ((b4) << 24), 4)
 
 int luaJ_create(lua_State* L, Proto *p);
-void luaJ_init_offset(CallInfo *ci);
+void luaJ_free(lua_State* L, Proto *p);
 /* VM functions */
 void vm_setobj(lua_State* L, TValue *a, TValue *b);
 void vm_add(lua_State* L, TValue *ra, TValue *rb, TValue *rc);

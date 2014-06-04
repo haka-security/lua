@@ -208,10 +208,11 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
     L->ci->callstatus |= CIST_REENTRY;
     if (!ncl->p->jit) luaJ_create(L, ncl->p);
     if (ncl->p->jit != NULL) {
+      unsigned int offset = L->ci->u.l.savedpc - ncl->p->code;
       ncl->p->called++;
-      int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+      int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
           (void *)ncl->p->jit;
-		  jitexecute(L, L->ci, ncl);
+		  jitexecute(L, L->ci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
       return;
     }
   }
@@ -462,13 +463,14 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 		 */
 		nci = L->ci = oci;  /* remove new frame */
 		ncl = clLvalue(nci->func);
-		luaJ_init_offset(nci);
     if (!ncl->p->jit) luaJ_create(L, ncl->p);
 		if (ncl->p->jit != NULL) {
+      unsigned int offset = nci->u.l.savedpc - ncl->p->code;
+      printf("vm_tailcall: offset: %d\n", ncl->p->addrs[offset]);
       ncl->p->called++;
-			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl) =
+			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
 				(void *)ncl->p->jit;
-			jitexecute(L, nci, ncl);
+			jitexecute(L, nci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
 		}
 	}
 	return 0;

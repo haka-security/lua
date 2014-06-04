@@ -62,7 +62,6 @@ static int get_jit(lua_State* L, Proto *p)
 	if (!addrs) return 1;
 
 	for (proglen = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-//		Instruction i = code[pc];
 		addrs[pc]= proglen;
 		proglen += generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
 	}
@@ -80,7 +79,7 @@ static int get_jit(lua_State* L, Proto *p)
 	}
 	else {
 		free(addrs);
-		return -1;
+		return 1;
 	}
 
 	for (pc = 0; pc < p->sizecode; pc++)  {
@@ -95,12 +94,14 @@ static int get_jit(lua_State* L, Proto *p)
 
 		clen = prog - tmp;
 		if (clen != jitcodesz) {
+      free(addrs);
 			luaG_runerror(L, "Bad instruction size for instruction %s - %d/%d\n",
 					luaP_opnames[GET_OPCODE(i)], clen, jitcodesz);
+      return 1;
 		}
 
 	}
-	free(addrs);
+  p->addrs = addrs;
 	return 0;
 }
 
@@ -122,14 +123,14 @@ int luaJ_create(lua_State* L, Proto *p)
 		return 1;
 	}
 
-	if (jit_alloc(p) == 1) {
+	if (jit_alloc(p)) {
 		luaG_runerror(L, "luaJ_create: cannot alloc memory (%d bytes) for %s (from %d to %d)\n",
 				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
         p->lastlinedefined);
 		return 1;
 	}
 
-	if (get_jit(L, p) != 0) {
+	if (get_jit(L, p)) {
 		jit_free(p);
 		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
 				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
@@ -139,10 +140,11 @@ int luaJ_create(lua_State* L, Proto *p)
 	return 0;
 }
 
-void luaJ_init_offset(CallInfo *ci)
+void luaJ_free(lua_State* L, Proto *p)
 {
-	/* Create initial offset for jmpq in prologu */
-	ci->u.l.jitoffset = PROLOGUE_LEN;
+  p->sizejit = 0;
+  jit_free(p);
+  free(p->addrs);
 }
 
 /**
@@ -152,7 +154,7 @@ static inline void jit_set_proto(lua_State *L, Proto *p, int state)
 {
   int i;
   if (state) luaJ_create(L, p);
-  else jit_free(p);
+  else luaJ_free(L, p);
   for(i = 0; i < p->sizep; i++) {
     jit_set_proto(L, p->p[i], state);
   }
@@ -166,10 +168,7 @@ static inline int jit_add_remove(lua_State *L, int state)
   if (n == 0) {
     CallInfo *ci = L->ci->previous;
     if (ci && ttisLclosure(ci->func)) {
-      Proto *p = clLvalue(ci->func)->p;
-      for (i = 0; i < p->sizep; i++) {
-        jit_set_proto(L, p->p[i], state);
-      }
+      jit_set_proto(L, clLvalue(ci->func)->p, state);
     }
   }
   else {
@@ -196,14 +195,11 @@ static int jit_remove(lua_State *L)
 /**
  * Jit statistics functions
  */
-static inline void jit_print_proto(lua_State *L, Proto *p, int level)
+static inline void jit_print_proto(lua_State *L, Proto *p)
 {
   int i;
   const char* s = p->source ? getstr(p->source) : "?";
 
-  for (i = 0; i < level; i++) {
-    fprintf(stderr, "  ");
-  }
   if (p->jit != NULL) {
     fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d) called %d times\n",
         p->linedefined == 0 ? "main":"function", s,
@@ -211,7 +207,7 @@ static inline void jit_print_proto(lua_State *L, Proto *p, int level)
   }
 
   for(i = 0; i < p->sizep; i++) {
-    jit_print_proto(L, p->p[i], level+1);
+    jit_print_proto(L, p->p[i]);
   }
 }
 
@@ -224,14 +220,14 @@ static int jit_stats(lua_State *L)
     CallInfo *ci = L->ci->previous;
     if (ci && ttisLclosure(ci->func)) {
       Proto *p = clLvalue(ci->func)->p;
-      jit_print_proto(L, p, 0);
+      jit_print_proto(L, p);
     }
   }
   else {
     for (i = 1; i <= n; i++) {
       p = lua_tolfunction(L, i);
       if (p) {
-        jit_print_proto(L, p, 0);
+        jit_print_proto(L, p);
       }
     }
   }

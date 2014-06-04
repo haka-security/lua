@@ -489,6 +489,7 @@ typedef struct Proto {
   unsigned char *jit;
   int sizejit;
   int called;
+  unsigned int *addrs;
 #endif
 } Proto;
 
