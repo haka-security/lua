@@ -28,73 +28,10 @@
 #define luai_runtimecheck(L, c)		/* void */
 #endif
 
-void vm_setobj(lua_State* L, TValue *a, TValue *b)
-{
-	a->value_ = b->value_;
-	a->tt_ = b->tt_;
-	checkliveness(G(L),a);
-}
-
-void vm_setbool(TValue *a, int b)
-{
-	val_(a).b=(b); settt_(a, LUA_TBOOLEAN);
-}
-
-void vm_setnil(TValue *a, int b)
-{
-	TValue *ra = a;
-	int rb = b;
-	do {
-		setnilvalue(ra++);
-	} while(rb--);
-}
-
 void vm_not(TValue *ra, TValue *rb)
 {
 	int res = l_isfalse(rb);  /* next assignment may change this value */
 	setbvalue(ra, res);
-}
-
-void vm_add(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numadd(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_ADD);
-	}
-}
-void vm_sub(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numsub(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_SUB);
-	}
-}
-
-void vm_mul(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_nummul(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_MUL);
-	}
-}
-void vm_div(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numdiv(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_DIV);
-	}
 }
 void vm_mod(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
 {
