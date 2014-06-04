@@ -82,13 +82,21 @@ static int get_jit(lua_State* L, Proto *p)
 		return 1;
 	}
 
+  /**
+   * Clen opcodes stats
+   */
+  for(pc = 0; pc < NUM_OPCODES; pc++) {
+    p->opcodes[pc] = 0;
+  }
+
 	for (pc = 0; pc < p->sizecode; pc++)  {
 		uint8_t *tmp = prog;
 		uint32_t clen = 0;
 		Instruction i = code[pc];
-    int jitcodesz = generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
+    int jitcodesz = generator[GET_OPCODE(i)].size(p, code, NULL, pc);
 
-    if (generator[GET_OPCODE(code[pc])].create != NULL) {
+    p->opcodes[GET_OPCODE(i)]++;
+    if (generator[GET_OPCODE(i)].create != NULL) {
       prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
     }
 
@@ -195,19 +203,28 @@ static int jit_remove(lua_State *L)
 /**
  * Jit statistics functions
  */
-static inline void jit_print_proto(lua_State *L, Proto *p)
+static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
 {
-  int i;
+  int i, sz;
   const char* s = p->source ? getstr(p->source) : "?";
+  char *r = luaL_prepbuffer(b);
 
   if (p->jit != NULL) {
-    fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d) called %d times\n",
+    sz = sprintf(r, "\n%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
         p->linedefined == 0 ? "main":"function", s,
         p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
+    luaL_addsize(b, sz);
+    for (i = 0; i < NUM_OPCODES; i++) {
+      if (p->opcodes[i]) {
+        r = luaL_prepbuffer(b);
+        sz = sprintf(r, "  %s: %d\n", luaP_opnames[i], p->opcodes[i]);
+        luaL_addsize(b, sz);
+      }
+    }
   }
 
   for(i = 0; i < p->sizep; i++) {
-    jit_print_proto(L, p->p[i]);
+    jit_print_proto(L, p->p[i], b);
   }
 }
 
@@ -215,23 +232,26 @@ static int jit_stats(lua_State *L)
 {
   int i, n = lua_gettop(L);
   Proto *p;
+  luaL_Buffer b;
+  luaL_buffinit(L,&b);
 
   if (n == 0) {
     CallInfo *ci = L->ci->previous;
     if (ci && ttisLclosure(ci->func)) {
       Proto *p = clLvalue(ci->func)->p;
-      jit_print_proto(L, p);
+      jit_print_proto(L, p, &b);
     }
   }
   else {
     for (i = 1; i <= n; i++) {
       p = lua_tolfunction(L, i);
       if (p) {
-        jit_print_proto(L, p);
+        jit_print_proto(L, p, &b);
       }
     }
   }
-  return 0;
+  luaL_pushresult(&b);
+  return 1;
 }
 
 static const luaL_Reg jitlib[] = {

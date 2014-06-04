@@ -14,7 +14,9 @@
 
 #include "llimits.h"
 #include "lua.h"
-
+#ifdef LUA_USE_JIT
+#include "lopcodes.h"
+#endif
 
 /*
 ** Extra tags for non-values
@@ -490,6 +492,7 @@ typedef struct Proto {
   int sizejit;
   int called;
   unsigned int *addrs;
+  unsigned int opcodes[NUM_OPCODES];
 #endif
 } Proto;
 
