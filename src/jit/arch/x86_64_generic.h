@@ -212,7 +212,7 @@
 	/* mov -32(%rbp), %r15 */ \
 	APPEND4(0x4c, 0x8b, 0x7d, 0xe0);
 
-#define PROLOGUE_LEN 48
+#define PROLOGUE_LEN 43
 #define JIT_PROLOGUE \
 	APPEND4(0x55, 0x48, 0x89, 0xe5); /* push %rbp; mov %rsp,%rbp */ \
 	APPEND4(0x48, 0x83, 0xec, 32);    /* subq  $32,%rsp       */ \
@@ -230,7 +230,6 @@
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
 	/* mov %rax, %r12 */ \
 	APPEND3(0x49, 0x89, 0xc4); \
-  NOP5; \
 	/* jmpq *%rcx */ \
 	APPEND2(0xff, 0xe1);
 
