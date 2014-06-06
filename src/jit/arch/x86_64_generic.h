@@ -7,6 +7,8 @@
 #ifndef __x86_64_generic_h__
 #define __x86_64_generic_h__
 
+#define OP_SZ_MAX 110
+
 /* Jumps constants */
 #define X86_JB  0x72
 #define X86_JAE 0x73
@@ -232,6 +234,10 @@
 	APPEND3(0x49, 0x89, 0xc4); \
 	/* jmpq *%rcx */ \
 	APPEND2(0xff, 0xe1);
+
+
+#define OP_IN_LOCAL_SCOPE(pc, local) ((pc) >= (local)->startpc && pc < (local)->endpc)
+
 
 /**
  * OP_MOVE opcode

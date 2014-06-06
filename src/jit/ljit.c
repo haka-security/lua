@@ -29,91 +29,13 @@
 #error "Jit is not supported for this plateform"
 #endif
 
-static int get_jit_size(lua_State *L, Proto *p)
+int luaJ_create(lua_State* L, Proto *p)
 {
-	int len = 0, pc, sz;
-	const Instruction* code = p->code;
-
-	for (len = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-    sz = 0;
-    if (generator[GET_OPCODE(code[pc])].size != NULL) {
-      sz = generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
-    }
-		if (!sz) {
-			luaG_runerror(L, "Unknown instruction size for %s\n", luaP_opnames[GET_OPCODE(code[pc])]);
-			return sz;
-		}
-		len += sz;
-	}
-	return len;
-}
-
-static int get_jit(lua_State* L, Proto *p)
-{
-	uint8_t *prog;
-	int pc, proglen;
+	uint8_t *prog, *tmp, *orig;
+	int pc;
 	unsigned int *addrs; /* addresses of image addr offset */
 	const Instruction* code = p->code;
 
-	prog = p->jit;
-
-	/* SetUp max addresses for Jumps */
-	addrs = malloc(sizeof(*addrs)*(p->sizecode+1));
-	if (!addrs) return 1;
-
-	for (proglen = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-		addrs[pc]= proglen;
-		proglen += generator[GET_OPCODE(code[pc])].size(p, code, NULL, pc);
-	}
-	/* offset addrss for the least instruction */
-	addrs[pc] = proglen;
-
-	if (p->sizecode > 0) {
-		/* Prologue */
-		uint8_t *tmp = prog;
-		JIT_PROLOGUE;
-		if (prog - tmp != PROLOGUE_LEN) {
-			luaG_runerror(L, "Bad function prologue size for %d/%d\n", (prog - tmp), PROLOGUE_LEN);
-		}
-		/* End of prologue */
-	}
-	else {
-		free(addrs);
-		return 1;
-	}
-
-  /**
-   * Clen opcodes stats
-   */
-  for(pc = 0; pc < NUM_OPCODES; pc++) {
-    p->opcodes[pc] = 0;
-  }
-
-	for (pc = 0; pc < p->sizecode; pc++)  {
-		uint8_t *tmp = prog;
-		uint32_t clen = 0;
-		Instruction i = code[pc];
-    int jitcodesz = generator[GET_OPCODE(i)].size(p, code, NULL, pc);
-
-    if (generator[GET_OPCODE(i)].create != NULL) {
-      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
-    }
-
-		clen = prog - tmp;
-		if (clen != jitcodesz) {
-      free(addrs);
-			luaG_runerror(L, "Bad instruction size for instruction %s - %d/%d\n",
-					luaP_opnames[GET_OPCODE(i)], clen, jitcodesz);
-      return 1;
-		}
-
-	}
-  p->addrs = addrs;
-	return 0;
-}
-
-int luaJ_create(lua_State* L, Proto *p)
-{
 	if (!L || !p) return 1;
 
 	if (p->sizejit && p->jit) {
@@ -121,37 +43,109 @@ int luaJ_create(lua_State* L, Proto *p)
 	}
 
   p->called = 0;
-	p->sizejit = get_jit_size(L, p);
-	if (!p->sizejit) {
-		luaG_runerror(L, "luaJ_create: cannot get jit size for %s (from %d to %d)\n",
-				p->source ? getstr(p->source) : "?", p->linedefined,
-        p->lastlinedefined);
-		p->jit = NULL;
-		return 1;
-	}
 
+  /**
+   * Alloc temporary code buffer
+   */
+  prog = luaM_malloc(L, (p->sizecode+1)*OP_SZ_MAX);
+  if (!prog) {
+    luaG_runerror(L, "No enougth memory to alloc Jit temporary code\n");
+    return 1;
+  }
+
+	/* SetUp max addresses for Jumps and initialize it */
+  addrs = luaM_newvector(L, p->sizecode+1, unsigned int);
+	if (!addrs) {
+    luaG_runerror(L, "Not enougth memory to alloc Jit addresses\n");
+    luaM_free(L, prog);
+    return 1;
+  }
+  for (pc = 0; pc <= p->sizecode; pc++) addrs[pc] = JITADDR_NONE;
+
+  /**
+   * Fist pass - prologue, then code
+   */
+  tmp = prog;
+  orig= prog;
+  JIT_PROLOGUE;
+  addrs[0] = prog - tmp;
+  for (pc = 0; pc < p->sizecode; pc++)  {
+    Instruction i = code[pc];
+
+    if (generator[GET_OPCODE(i)].create != NULL) {
+      tmp = prog;
+      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
+      addrs[pc+1] = addrs[pc] + prog - tmp;
+    }
+    else {
+      luaG_runerror(L, "Bad instruction %s\n", luaP_opnames[GET_OPCODE(i)]);
+      luaM_free(L, prog);
+      luaM_free(L, addrs);
+      return 1;
+    }
+  }
+
+  /**
+   * Verify addrs and get final size
+   */
+  for (pc = 0; pc <= p->sizecode; pc++) {
+    if (addrs[pc] == JITADDR_NONE) {
+      luaG_runerror(L, "Error on Jit generation\n");
+      luaM_free(L, prog);
+      luaM_free(L, addrs);
+      return 1;
+    }
+  }
+  p->sizejit = addrs[p->sizecode];
+
+  /**
+   * Alloc real buffer and free temporary one
+   */
 	if (jit_alloc(p)) {
 		luaG_runerror(L, "luaJ_create: cannot alloc memory (%d bytes) for %s (from %d to %d)\n",
 				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
         p->lastlinedefined);
 		return 1;
 	}
+  luaM_free(L, orig);
 
-	if (get_jit(L, p)) {
-		jit_free(p);
-		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
-				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
-        p->lastlinedefined);
-		return 1;
-	}
-	return 0;
+  /**
+   * Second pass
+   */
+  prog = p->jit;
+  tmp = prog;
+  JIT_PROLOGUE;
+  addrs[0] = prog - tmp;
+  for (pc = 0; pc < p->sizecode; pc++)  {
+    Instruction i = code[pc];
+
+    if (generator[GET_OPCODE(i)].create != NULL) {
+      tmp = prog;
+      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
+      addrs[pc+1] = addrs[pc] + prog - tmp;
+    }
+    else {
+      luaG_runerror(L, "Bad instruction %s\n", luaP_opnames[GET_OPCODE(i)]);
+      luaM_free(L, prog);
+      luaM_free(L, addrs);
+      return 1;
+    }
+  }
+  p->addrs = addrs;
+  /**
+   * Clen opcodes stats
+   */
+  for(pc = 0; pc < NUM_OPCODES; pc++) {
+    p->opcodes[pc] = 0;
+  }
+  return 0;
 }
 
 void luaJ_free(lua_State* L, Proto *p)
 {
   p->sizejit = 0;
   jit_free(p);
-  free(p->addrs);
+  luaM_free(L, p->addrs);
 }
 
 /**

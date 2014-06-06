@@ -462,6 +462,14 @@ typedef struct LocVar {
   int endpc;    /* first point where variable is dead */
 } LocVar;
 
+#ifdef LUA_USE_JIT
+typedef struct Consts
+{
+  LocVar *local;
+  TValue *k;
+} Consts;
+#endif
+
 /*
 ** Function Prototypes
 */
@@ -493,6 +501,7 @@ typedef struct Proto {
   int called;
   unsigned int *addrs;
   unsigned int opcodes[NUM_OPCODES];
+  Consts *constants;
 #endif
 } Proto;
 

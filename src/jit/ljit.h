@@ -9,8 +9,6 @@
 #include "../lobject.h"
 #include <stdint.h>
 
-#define JIT_DEBUG
-
 struct jit_generator {
   int (*size) (Proto *p, const Instruction *code, unsigned int *addrs, int pc);
   uint8_t *(*create) (uint8_t *bin, Proto *p, const Instruction *code, unsigned int *addrs, int pc);
@@ -52,6 +50,9 @@ static inline uint8_t is_imm8(int value)
 #define APPEND2(b1, b2)           APPEND((b1) + ((b2) << 8), 2)
 #define APPEND3(b1, b2, b3)       APPEND2(b1,b2);APPEND1(b3)
 #define APPEND4(b1, b2, b3, b4)   APPEND((b1) + ((b2) << 8) + ((b3) << 16) + ((b4) << 24), 4)
+
+#define JITADDR_NONE -1
+
 
 int luaJ_create(lua_State* L, Proto *p);
 void luaJ_free(lua_State* L, Proto *p);
