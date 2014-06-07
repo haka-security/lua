@@ -9,11 +9,6 @@
 #include "../lobject.h"
 #include <stdint.h>
 
-struct jit_generator {
-  int (*size) (Proto *p, const Instruction *code, unsigned int *addrs, int pc);
-  uint8_t *(*create) (uint8_t *bin, Proto *p, const Instruction *code, unsigned int *addrs, int pc);
-};
-
 static inline uint8_t *append(uint8_t *ptr, uint64_t bytes, unsigned int len)
 {
 	if (ptr) {

@@ -242,11 +242,6 @@
 /**
  * OP_MOVE opcode
  */
-static inline int op_move_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 52;
-}
 static inline uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -269,11 +264,6 @@ static inline uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction 
 /**
  * OP_LOADK opcode
  */
-static int op_loadk_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 49;
-}
 static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -297,12 +287,6 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_LOADKX opcode
  */
-static int op_loadkx_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 51;
-}
-
 static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -329,11 +313,6 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
 /**
  * OP_LOADBOOL opcode
  */
-static inline int op_loadbool_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 46;
-}
 static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -362,11 +341,6 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
 /**
  * OP_LOADNIL opcode
  */
-static int op_loadnil_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 34 + (11 * (GETARG_B(code[pc]) + 1));
-}
 static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -390,11 +364,6 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_GETUPVAL opcode
  */
-static int op_getupval_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 50;
-}
 static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -414,11 +383,6 @@ static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_GETTABUP opcode
  */
-static int op_gettabup_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 64;
-}
 static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -441,11 +405,6 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_GETTABLE opcode
  */
-static int op_gettable_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 69;
-}
 static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -466,11 +425,6 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_SETTABUP opcode
  */
-static int op_settabup_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 64;
-}
 static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -493,11 +447,6 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_SETUPVAL opcode
  */
-static int op_setupval_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 50;
-}
 static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -517,11 +466,6 @@ static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_SETTABLE opcode
  */
-static int op_settable_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 69;
-}
 static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -541,11 +485,6 @@ static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_NEWTABLE opcode
  */
-static int op_newtable_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 63;
-}
 static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -571,11 +510,6 @@ static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_SELF
  */
-static int op_self_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 69;
-}
 static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -595,11 +529,6 @@ static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_ADD opcode
  */
-static int op_add_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 108;
-}
 static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -645,11 +574,6 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_SUB opcode
  */
-static int op_sub_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 108;
-}
 static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -695,11 +619,6 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_MUL opcode
  */
-static int op_mul_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 108;
-}
 static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -745,11 +664,6 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_DIV opcode
  */
-static int op_div_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 108;
-}
 static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -795,11 +709,6 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_MOD opcode
  */
-static int op_mod_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 69;
-}
 static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -822,11 +731,6 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_POW opcode
  */
-static int op_pow_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 69;
-}
 static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -849,11 +753,6 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_UNM
  */
-static int op_unm_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 59;
-}
 static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -874,11 +773,6 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_NOT opcode
  */
-static int op_not_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 52;
-}
 static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -894,11 +788,6 @@ static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_LEN opcode
  */
-static int op_len_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 59;
-}
 static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -918,11 +807,6 @@ static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_CONCAT opcode
  */
-static int op_concat_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 94;
-}
 static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -955,11 +839,6 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
 /**
  * OP_JMP opcode
  */
-static int op_jmp_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 48;
-}
 static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -982,11 +861,6 @@ static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_EQ opcode
  */
-static int op_eq_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 76;
-}
 static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1011,11 +885,6 @@ static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_LT opcode
  */
-static int op_lt_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 76;
-}
 static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1040,11 +909,6 @@ static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_LE opcode
  */
-static int op_le_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 76;
-}
 static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1069,11 +933,6 @@ static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_TEST opcode
  */
-static int op_test_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 62;
-}
 static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1096,11 +955,6 @@ static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_TESTSET opcode
  */
-static int op_testset_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 60;
-}
 static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1121,11 +975,6 @@ static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_CALL opcode
  */
-static int op_call_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 62;
-}
 static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1152,11 +1001,6 @@ static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
 /**
  * OP_TAILCALL opcaode
  */
-static int op_tailcall_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 84;
-}
 static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1193,10 +1037,6 @@ static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_RETURN opcode
  */
-static int op_return_size(Proto *p, const Instruction *code, unsigned int *addrs, int pc)
-{
-  return 75;
-}
 static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1223,11 +1063,6 @@ static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code
 /**
  * OP_FORLOOP opcode
  */
-static int op_forloop_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 54;
-}
 static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1249,11 +1084,6 @@ static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_FORPREP opcode
  */
-static int op_forprep_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 50;
-}
 static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1272,11 +1102,6 @@ static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_TFORCALL opcode
  */
-static int op_tforcall_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 57;
-}
 static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1299,11 +1124,6 @@ static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_TFORLOOP opcode
  */
-static int op_tforloop_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 54;
-}
 static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1324,11 +1144,6 @@ static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *co
 /**
  * OP_SETLIST opcode
  */
-static int op_setlist_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 67;
-}
 static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1364,11 +1179,6 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_CLOSURE opcode
  */
-static int op_closure_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 61;
-}
 static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1394,11 +1204,6 @@ static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *cod
 /**
  * OP_VARARG opcode
  */
-static int op_vararg_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 56;
-}
 static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1425,12 +1230,6 @@ static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code
 /**
  * OP_EXTRAARG opcode
  */
-
-static int op_extraarg_size(Proto *p, const Instruction *code,
-    unsigned int *addrs, int pc)
-{
-  return 1;
-}
 static uint8_t *op_extraarg_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
@@ -1439,49 +1238,49 @@ static uint8_t *op_extraarg_create(uint8_t *bin, Proto *p, const Instruction *co
   return prog;
 }
 
-static struct jit_generator generator[NUM_OPCODES] =
+static uint8_t *(*jit_create_funcs[NUM_OPCODES]) (uint8_t *bin, Proto *p, const Instruction *code, unsigned int *addrs, int pc) =
 {
-  { op_move_size, op_move_create },/* OP_MOVE,	A B	R(A) := R(B)					*/
-  { op_loadk_size, op_loadk_create },/* OP_LOADK,	A Bx	R(A) := Kst(Bx)					*/
-  { op_loadkx_size, op_loadkx_create },/* OP_LOADKX,	A	R(A) := Kst(extra arg)				*/
-  { op_loadbool_size, op_loadbool_create },/* OP_LOADBOOL,	A B C	R(A) := (Bool)B; if (C) pc++			*/
-  { op_loadnil_size, op_loadnil_create },/* OP_LOADNIL,	A B	R(A), R(A+1), ..., R(A+B) := nil		*/
-  { op_getupval_size, op_getupval_create },/* OP_GETUPVAL,	A B	R(A) := UpValue[B]				*/
-  { op_gettabup_size, op_gettabup_create },/* OP_GETTABUP,	A B C	R(A) := UpValue[B][RK(C)]			*/
-  { op_gettable_size, op_gettable_create },/* OP_GETTABLE,	A B C	R(A) := R(B)[RK(C)]				*/
-  { op_settabup_size, op_settabup_create },/* OP_SETTABUP,A B C	UpValue[A][RK(B)] := RK(C)			*/
-  { op_setupval_size, op_setupval_create },/* OP_SETUPVAL,	A B	UpValue[B] := R(A)				*/
-  { op_settable_size, op_settable_create },/* OP_SETTABLE,	A B C	R(A)[RK(B)] := RK(C)				*/
-  { op_newtable_size, op_newtable_create },/* OP_NEWTABLE,	A B C	R(A) := {} (size = B,C)				*/
-  { op_self_size, op_self_create },/* OP_SELF,	A B C	R(A+1) := R(B); R(A) := R(B)[RK(C)]		*/
-  { op_add_size, op_add_create },/* OP_ADD,	A B C	R(A) := RK(B) + RK(C)				*/
-  { op_sub_size, op_sub_create },/* OP_SUB,	A B C	R(A) := RK(B) - RK(C)				*/
-  { op_mul_size, op_mul_create },/* OP_MUL,	A B C	R(A) := RK(B) * RK(C)				*/
-  { op_div_size, op_div_create },/* OP_DIV,	A B C	R(A) := RK(B) / RK(C)				*/
-  { op_mod_size, op_mod_create },/* OP_MOD,	A B C	R(A) := RK(B) % RK(C)				*/
-  { op_pow_size, op_pow_create },/* OP_POW,	A B C	R(A) := RK(B) ^ RK(C)				*/
-  { op_unm_size, op_unm_create },/* OP_UNM,	A B	R(A) := -R(B)					*/
-  { op_not_size, op_not_create },/* OP_NOT,	A B	R(A) := not R(B)				*/
-  { op_len_size, op_len_create },/* OP_LEN,	A B	R(A) := length of R(B)				*/
-  { op_concat_size, op_concat_create },/* OP_CONCAT,	A B C	R(A) := R(B).. ... ..R(C)			*/
-  { op_jmp_size, op_jmp_create },/* OP_JMP,	A sBx	pc+=sBx; if (A) close all upvalues >= R(A) + 1	*/
-  { op_eq_size, op_eq_create },/* OP_EQ,	A B C	if ((RK(B) == RK(C)) ~= A) then pc++		*/
-  { op_lt_size, op_lt_create },/* OP_LT,	A B C	if ((RK(B) <  RK(C)) ~= A) then pc++		*/
-  { op_le_size, op_le_create },/* OP_LE,	A B C	if ((RK(B) <= RK(C)) ~= A) then pc++		*/
-  { op_test_size, op_test_create },/* OP_TEST,	A C	if not (R(A) <=> C) then pc++			*/
-  { op_testset_size, op_testset_create },/* OP_TESTSET,	A B C	if (R(B) <=> C) then R(A) := R(B) else pc++	*/
-  { op_call_size, op_call_create },/* OP_CALL,	A B C	R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1)) */
-  { op_tailcall_size, op_tailcall_create },/* OP_TAILCALL,	A B C	return R(A)(R(A+1), ... ,R(A+B-1))		*/
-  { op_return_size, op_return_create },/* OP_RETURN,	A B	return R(A), ... ,R(A+B-2)	(see note)	*/
-  { op_forloop_size, op_forloop_create },/* OP_FORLOOP,	A sBx	R(A)+=R(A+2);
+  op_move_create,/* OP_MOVE,	A B	R(A) := R(B)					*/
+  op_loadk_create,/* OP_LOADK,	A Bx	R(A) := Kst(Bx)					*/
+  op_loadkx_create,/* OP_LOADKX,	A	R(A) := Kst(extra arg)				*/
+  op_loadbool_create,/* OP_LOADBOOL,	A B C	R(A) := (Bool)B; if (C) pc++			*/
+  op_loadnil_create,/* OP_LOADNIL,	A B	R(A), R(A+1), ..., R(A+B) := nil		*/
+  op_getupval_create,/* OP_GETUPVAL,	A B	R(A) := UpValue[B]				*/
+  op_gettabup_create,/* OP_GETTABUP,	A B C	R(A) := UpValue[B][RK(C)]			*/
+  op_gettable_create,/* OP_GETTABLE,	A B C	R(A) := R(B)[RK(C)]				*/
+  op_settabup_create,/* OP_SETTABUP,A B C	UpValue[A][RK(B)] := RK(C)			*/
+  op_setupval_create,/* OP_SETUPVAL,	A B	UpValue[B] := R(A)				*/
+  op_settable_create,/* OP_SETTABLE,	A B C	R(A)[RK(B)] := RK(C)				*/
+  op_newtable_create,/* OP_NEWTABLE,	A B C	R(A) := {} (size = B,C)				*/
+  op_self_create,/* OP_SELF,	A B C	R(A+1) := R(B); R(A) := R(B)[RK(C)]		*/
+  op_add_create,/* OP_ADD,	A B C	R(A) := RK(B) + RK(C)				*/
+  op_sub_create,/* OP_SUB,	A B C	R(A) := RK(B) - RK(C)				*/
+  op_mul_create,/* OP_MUL,	A B C	R(A) := RK(B) * RK(C)				*/
+  op_div_create,/* OP_DIV,	A B C	R(A) := RK(B) / RK(C)				*/
+  op_mod_create,/* OP_MOD,	A B C	R(A) := RK(B) % RK(C)				*/
+  op_pow_create,/* OP_POW,	A B C	R(A) := RK(B) ^ RK(C)				*/
+  op_unm_create,/* OP_UNM,	A B	R(A) := -R(B)					*/
+  op_not_create,/* OP_NOT,	A B	R(A) := not R(B)				*/
+  op_len_create,/* OP_LEN,	A B	R(A) := length of R(B)				*/
+  op_concat_create,/* OP_CONCAT,	A B C	R(A) := R(B).. ... ..R(C)			*/
+  op_jmp_create,/* OP_JMP,	A sBx	pc+=sBx; if (A) close all upvalues >= R(A) + 1	*/
+  op_eq_create,/* OP_EQ,	A B C	if ((RK(B) == RK(C)) ~= A) then pc++		*/
+  op_lt_create,/* OP_LT,	A B C	if ((RK(B) <  RK(C)) ~= A) then pc++		*/
+  op_le_create,/* OP_LE,	A B C	if ((RK(B) <= RK(C)) ~= A) then pc++		*/
+  op_test_create,/* OP_TEST,	A C	if not (R(A) <=> C) then pc++			*/
+  op_testset_create,/* OP_TESTSET,	A B C	if (R(B) <=> C) then R(A) := R(B) else pc++	*/
+  op_call_create,/* OP_CALL,	A B C	R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1)) */
+  op_tailcall_create,/* OP_TAILCALL,	A B C	return R(A)(R(A+1), ... ,R(A+B-1))		*/
+  op_return_create,/* OP_RETURN,	A B	return R(A), ... ,R(A+B-2)	(see note)	*/
+  op_forloop_create,/* OP_FORLOOP,	A sBx	R(A)+=R(A+2);
                        if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }*/
-  { op_forprep_size, op_forprep_create },/* OP_FORPREP,	A sBx	R(A)-=R(A+2); pc+=sBx				*/
-  { op_tforcall_size, op_tforcall_create },/* OP_TFORCALL,	A C	R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));	*/
-  { op_tforloop_size, op_tforloop_create },/* OP_TFORLOOP,	A sBx	if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }*/
-  { op_setlist_size, op_setlist_create },/* OP_SETLIST,	A B C	R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B	*/
-  { op_closure_size, op_closure_create },/* OP_CLOSURE,	A Bx	R(A) := closure(KPROTO[Bx])			*/
-  { op_vararg_size, op_vararg_create },/* OP_VARARG,	A B	R(A), R(A+1), ..., R(A+B-2) = vararg		*/
-  { op_extraarg_size, op_extraarg_create }/* OP_EXTRAARG	Ax	extra (larger) argument for previous opcode	*/
+  op_forprep_create,/* OP_FORPREP,	A sBx	R(A)-=R(A+2); pc+=sBx				*/
+  op_tforcall_create,/* OP_TFORCALL,	A C	R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));	*/
+  op_tforloop_create,/* OP_TFORLOOP,	A sBx	if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }*/
+  op_setlist_create,/* OP_SETLIST,	A B C	R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B	*/
+  op_closure_create,/* OP_CLOSURE,	A Bx	R(A) := closure(KPROTO[Bx])			*/
+  op_vararg_create,/* OP_VARARG,	A B	R(A), R(A+1), ..., R(A+B-2) = vararg		*/
+  op_extraarg_create/* OP_EXTRAARG	Ax	extra (larger) argument for previous opcode	*/
 };
 
 #endif

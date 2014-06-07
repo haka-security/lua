@@ -72,17 +72,9 @@ int luaJ_create(lua_State* L, Proto *p)
   for (pc = 0; pc < p->sizecode; pc++)  {
     Instruction i = code[pc];
 
-    if (generator[GET_OPCODE(i)].create != NULL) {
-      tmp = prog;
-      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
-      addrs[pc+1] = addrs[pc] + prog - tmp;
-    }
-    else {
-      luaG_runerror(L, "Bad instruction %s\n", luaP_opnames[GET_OPCODE(i)]);
-      luaM_free(L, prog);
-      luaM_free(L, addrs);
-      return 1;
-    }
+    tmp = prog;
+    prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
+    addrs[pc+1] = addrs[pc] + prog - tmp;
   }
 
   /**
@@ -119,17 +111,9 @@ int luaJ_create(lua_State* L, Proto *p)
   for (pc = 0; pc < p->sizecode; pc++)  {
     Instruction i = code[pc];
 
-    if (generator[GET_OPCODE(i)].create != NULL) {
-      tmp = prog;
-      prog = generator[GET_OPCODE(i)].create(prog, p, code, addrs, pc);
-      addrs[pc+1] = addrs[pc] + prog - tmp;
-    }
-    else {
-      luaG_runerror(L, "Bad instruction %s\n", luaP_opnames[GET_OPCODE(i)]);
-      luaM_free(L, prog);
-      luaM_free(L, addrs);
-      return 1;
-    }
+    tmp = prog;
+    prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
+    addrs[pc+1] = addrs[pc] + prog - tmp;
   }
   p->addrs = addrs;
   /**
