@@ -44,13 +44,6 @@
  */
 
 #define NOP  APPEND1(0x90);
-#define NOP2 APPEND2(0x66, 0x90);
-#define NOP3 APPEND3(0x0f, 0x1f, 0x00);
-#define NOP4 APPEND4(0x0f, 0x1f, 0x40, 00);
-#define NOP5 APPEND3(0x0f, 0x1f, 0x44);APPEND2(0x00, 0x00);
-#define NOP6 APPEND4(0x66, 0x0f, 0x1f, 0x44); APPEND2(0x00, 0x00);
-#define NOP7 APPEND3(0x0f, 0x1f, 0x80);APPEND4(0x00, 0x00, 0x00, 0x00);
-#define NOP8 APPEND4(0x0f, 0x1f, 0x84, 0x00);APPEND4(0x00, 0x00, 0x00, 0x00);
 
 #define RABC_RDI(arg) \
 	/* mov %r15, %rdi */\
@@ -236,9 +229,6 @@
 	APPEND2(0xff, 0xe1);
 
 
-#define OP_IN_LOCAL_SCOPE(pc, local) ((pc) >= (local)->startpc && pc < (local)->endpc)
-
-
 /**
  * OP_MOVE opcode
  */
@@ -333,7 +323,6 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
 	}
 	else {
 		LUA_ADD_SAVEDPC(1);
-    NOP2;
 	}
   return prog;
 }
@@ -350,7 +339,6 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
 	LUA_ADD_SAVEDPC(1);
   LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
-  NOP6;
   do {
     /* movl $0x0, offset(%rdi) */
     APPEND3(0xc7, 0x47, offsetof(TValue, tt_));
