@@ -28,6 +28,16 @@
 #define luai_runtimecheck(L, c)		/* void */
 #endif
 
+
+void vm_hook(lua_State* L)
+{
+  if ((L->hookmask & (LUA_MASKLINE | LUA_MASKCOUNT)) &&
+      (--L->hookcount == 0 || L->hookmask & LUA_MASKLINE)) {
+    traceexec(L);
+  }
+}
+
+
 void vm_not(TValue *ra, TValue *rb)
 {
 	int res = l_isfalse(rb);  /* next assignment may change this value */
@@ -104,10 +114,11 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
   }
 }
 
-void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
+void vm_closure(lua_State* L, TValue *ra, CallInfo *ci, int bx)
 {
 	LClosure *cl = clLvalue(ci->func);
   Proto *p = cl->p->p[bx];
+  TValue *base = ci->u.l.base;
   Closure *ncl = getcached(p, cl->upvals, base);  /* cached closure */
 
   if (ncl == NULL)  /* no match? */
@@ -120,10 +131,11 @@ void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
   luai_threadyield(L);
 }
 
-int vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)
+int vm_return(lua_State* L, TValue *ra, CallInfo *ci, int b)
 {
 	int nb = 0;
 	LClosure *cl = clLvalue(ci->func);
+  TValue *base = ci->u.l.base;
 
 	if (b != 0) L->top = ra+b-1;
 	if (cl->p->sizep > 0) luaF_close(L, base);
@@ -288,9 +300,10 @@ void vm_setconcat(lua_State* L, CallInfo *ci, TValue *ra, TValue *rb)
 	L->top = ci->top;  /* restore top */
 }
 
-void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
+void vm_vararg(lua_State* L, CallInfo *ci, int a, int b)
 {
 	LClosure *cl = clLvalue(ci->func);
+  TValue *base = ci->u.l.base;
 	int nb = b - 1;
 	int j;
 	int n = cast_int(base - ci->func) - cl->p->numparams - 1;
@@ -312,10 +325,10 @@ void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 	}
 }
 
-int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
+int vm_tailcall(lua_State* L, CallInfo *ci, int a, int b)
 {
 	LClosure *cl = clLvalue(ci->func);
-	TValue *ra = base+a;
+	TValue *ra = (ci->u.l.base)+a;
 
 	if (b != 0) L->top = ra+b;  /* else previous instruction set top */
 

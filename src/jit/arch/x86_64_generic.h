@@ -24,9 +24,8 @@
  *  %rax : scratch register
  *  %r10 : scratch register
  *  %rbx : L (Lua state) callee saved register
- *  %r12 : &savedpc
+ *  %r12 : &savedpc callee saved register
  *  %r13 : ci (Call Info) callee saved register
- *  %r15 : base (stack base) callee saved register
  *
  * ABI: %rdi, %rsi, %rdx, %rcx, %r8, %r9
  *
@@ -34,7 +33,6 @@
  *  -8(%rbp): saved %rbx callee saved register
  *  -16(%rbp): saved %r12 callee saved register
  *  -24(%rbp): saved %r13 callee saved register
- *  -32(%rbp): saved %r15 callee saved register
  *
  * Call:
  *  %rdi: Lua state
@@ -46,8 +44,8 @@
 #define NOP  APPEND1(0x90);
 
 #define RABC_RDI(arg) \
-	/* mov %r15, %rdi */\
-	APPEND3(0x4c, 0x89, 0xff);\
+  /* mov offset8(%r13), %rdi*/ \
+  APPEND4(0x49, 0x8b, 0x7d, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rdi */ \
 	APPEND3(0x48, 0x81, 0xc7);\
 	APPEND((arg)*sizeof(TValue), 4);
@@ -63,8 +61,8 @@
 	}
 
 #define RABC_RSI(arg) \
-	/* mov %r15, %rsi */\
-	APPEND3(0x4c, 0x89, 0xfe);\
+  /* mov offset8(%r13), %rsi*/ \
+  APPEND4(0x49, 0x8b, 0x75, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rsi */ \
 	APPEND3(0x48, 0x81, 0xc6);\
 	APPEND((arg)*sizeof(TValue), 4);
@@ -80,8 +78,8 @@
 	}
 
 #define RABC_RDX(arg) \
-	/* mov %r15, %rdx */\
-	APPEND3(0x4c, 0x89, 0xfa);\
+  /* mov offset8(%r13), %rdx */ \
+  APPEND4(0x49, 0x8b, 0x55, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rdx */ \
 	APPEND3(0x48, 0x81, 0xc2);\
 	APPEND((arg)*sizeof(TValue), 4);
@@ -97,8 +95,8 @@
 	}
 
 #define RABC_RCX(arg) \
-	/* mov %r15, %rcx */\
-	APPEND3(0x4c, 0x89, 0xf9);\
+  /* mov offset8(%r13), %rcx */ \
+  APPEND4(0x49, 0x8b, 0x4d, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rcx */ \
 	APPEND3(0x48, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
@@ -114,8 +112,8 @@
 	}
 
 #define RABC_R8(arg) \
-	/* mov %r15, %r8 */\
-	APPEND3(0x4d, 0x89, 0xf8);\
+  /* mov offset8(%r13), %r8 */ \
+  APPEND4(0x4d, 0x8b, 0x45, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %r8 */ \
 	APPEND3(0x49, 0x81, 0xc0);\
 	APPEND((arg)*sizeof(TValue), 4);
@@ -131,9 +129,9 @@
 	}
 
 #define RABC_R9(arg) \
-	/* mov %r15, %r8 */\
-	APPEND3(0x4c, 0x89, 0xf9);\
-	/* add (arg)*sizeof(TValue), %r8 */ \
+  /* mov offset8(%r13), %r9 */ \
+  APPEND4(0x4d, 0x8b, 0x4d, offsetof(CallInfo, u.l.base)); \
+	/* add (arg)*sizeof(TValue), %r9 */ \
 	APPEND3(0x49, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
 
@@ -148,19 +146,12 @@
 	}
 
 #define JIT_RABC(arg) { \
-	/* mov %r15, %rax */\
-	APPEND3(0x4c, 0x89, 0xf8);\
-    /* add arg*sizeof(TValue), %rax*/\
-    APPEND2(0x48, 0x05);\
-    APPEND((arg)*sizeof(TValue), 4);\
+  /* mov offset8(%r13), %rax */ \
+  APPEND4(0x49, 0x8b, 0x45, offsetof(CallInfo, u.l.base)); \
+  /* add arg*sizeof(TValue), %rax*/\
+  APPEND2(0x48, 0x05);\
+  APPEND((arg)*sizeof(TValue), 4);\
 }
-
-/**
- * Update base stack if needed
- */
-#define LUA_UPDATE_BASE \
-	/* mov offset8(%r13),%r15 */ \
-	APPEND4(0x4d, 0x8b, 0x7d, offsetof(CallInfo, u.l.base));
 
 /**
  * Increment savedpc used in lvm.c
@@ -194,8 +185,6 @@
 	APPEND4(0x4c, 0x89, 0x65, 0xf0); \
 	/* mov %r13, -24(%rbp) */ \
 	APPEND4(0x4c, 0x89, 0x6d, 0xe8); \
-	/* mov %r15, -32(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x7d, 0xe0);
 
 #define RESTORE_REGISTERS \
 	/* mov -8(%rbp), %rbx */ \
@@ -204,21 +193,16 @@
 	APPEND4(0x4c, 0x8b, 0x65, 0xf0); \
 	/* mov -24(%rbp), %r13 */ \
 	APPEND4(0x4c, 0x8b, 0x6d, 0xe8); \
-	/* mov -32(%rbp), %r15 */ \
-	APPEND4(0x4c, 0x8b, 0x7d, 0xe0);
 
-#define PROLOGUE_LEN 43
 #define JIT_PROLOGUE \
 	APPEND4(0x55, 0x48, 0x89, 0xe5); /* push %rbp; mov %rsp,%rbp */ \
-	APPEND4(0x48, 0x83, 0xec, 32);    /* subq  $32,%rsp       */ \
+	APPEND4(0x48, 0x83, 0xec, 32);    /* subq  $24,%rsp       */ \
 	/* First, save registers */ \
 	SAVE_REGISTERS; \
 	/* put L in %rbx */ \
 	APPEND3(0x48, 0x89, 0xfb); /* mov %rdi, %rbx */ \
 	/* put ci in r13 */ \
 	APPEND3(0x49, 0x89, 0xf5); \
-	/* put base in r15 */ \
-	LUA_UPDATE_BASE; \
 	\
 	/* put &savedpc in %r12 */ \
 	/* lea offset8(%r13),%rax */ \
@@ -230,14 +214,29 @@
 
 
 /**
- * OP_MOVE opcode
+ * Generic
  */
-static inline uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction *code,
+static inline uint8_t *op_generic(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
 	LUA_ADD_SAVEDPC(1);
   LUA_INC_OPCODE;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+  VM_CALL(vm_hook);
+  return prog;
+}
+
+
+
+/**
+ * OP_MOVE opcode
+ */
+static uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
 	RABC_RSI(GETARG_A(code[pc]));
 	RABC_RDX(GETARG_B(code[pc]));
 	/* mov (%rdx), %rax */
@@ -259,8 +258,6 @@ static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
 {
   uint8_t *prog = bin;
   TValue *rb = p->k + GETARG_Bx(code[pc]);
-  LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* Get RA in rax */
   JIT_RABC(GETARG_A(code[pc]));
   /* mov rb->_value, %r10 */
@@ -283,8 +280,7 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
   uint8_t *prog = bin;
   TValue *rax = p->k + GETARG_Ax(code[pc+1]);
 
-	LUA_ADD_SAVEDPC(2);
-  LUA_INC_OPCODE;
+	LUA_ADD_SAVEDPC(1);
 	/* Get RA in rax */
 	JIT_RABC(GETARG_A(code[pc]));
   /* mov rb->_value, %r10 */
@@ -307,7 +303,6 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
 	/* mov GETARG_B(i), %esi */
 	APPEND1(0xbe);
@@ -318,11 +313,8 @@ static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruct
 	APPEND3(0xc7, 0x47, 0x08);
 	APPEND(LUA_TBOOLEAN, 4);
 	if (GETARG_C(code[pc])) {
-		LUA_ADD_SAVEDPC(2);
-		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
-	}
-	else {
 		LUA_ADD_SAVEDPC(1);
+		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
 	}
   return prog;
 }
@@ -336,8 +328,6 @@ static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *cod
   uint8_t *prog = bin;
   int b = GETARG_B(code[pc]);
 
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
   do {
     /* movl $0x0, offset(%rdi) */
@@ -356,8 +346,6 @@ static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -375,8 +363,6 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov GETARG_B(i), %esi */
@@ -386,7 +372,6 @@ static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	RABC_RCX(GETARG_A(code[pc]));
 	VM_CALL(vm_gettabup);
 	/* vm_gettabup can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -397,8 +382,6 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_B(code[pc]));
@@ -406,7 +389,6 @@ static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *co
 	RABC_RCX(GETARG_A(code[pc]));
 	VM_CALL(luaV_gettable);
 	/* luaV_gettable can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -417,8 +399,6 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov GETARG_A(i), %esi */
@@ -428,7 +408,6 @@ static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *co
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_settabup);
 	/* vm_settabup can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -439,8 +418,6 @@ static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -458,15 +435,12 @@ static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	RKBC_RDX(GETARG_B(code[pc]), p);
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_settable);
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -477,8 +451,6 @@ static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -491,7 +463,6 @@ static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND2(0x41, 0xb8);
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_newtable);
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -502,15 +473,12 @@ static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	RKBC_RDX(GETARG_B(code[pc]), p);
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_self);
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -521,8 +489,6 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -548,14 +514,13 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 22);
+  APPEND2(X86_NJ, 18);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
   /* jmpq luaV_arith */
 	VM_CALL(luaV_arith);
 	/* vm_add can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -566,8 +531,6 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -593,14 +556,13 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 22);
+  APPEND2(X86_NJ, 18);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
   /* jmpq luaV_arith */
 	VM_CALL(luaV_arith);
 	/* vm_add can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -611,8 +573,6 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -638,14 +598,13 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 22);
+  APPEND2(X86_NJ, 18);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
   /* jmpq luaV_arith */
 	VM_CALL(luaV_arith);
 	/* vm_add can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -656,8 +615,6 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -683,14 +640,13 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 22);
+  APPEND2(X86_NJ, 18);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
   /* jmpq luaV_arith */
 	VM_CALL(luaV_arith);
 	/* vm_add can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -701,8 +657,6 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -712,7 +666,6 @@ static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_mod);
 	/* vm_mod can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -723,8 +676,6 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -734,7 +685,6 @@ static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
 	RKBC_RCX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_pow);
 	/* vm_mod can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -745,8 +695,6 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1); \
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */ \
 	APPEND3(0x48, 0x89, 0xdf); \
 	RABC_RSI(GETARG_A(code[pc])); \
@@ -754,7 +702,6 @@ static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
 	RKBC_RDX(GETARG_B(code[pc]), p); \
 	VM_CALL(vm_unm); \
 	/* vm_unm can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -765,8 +712,6 @@ static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1); \
-  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc])); \
 	RABC_RSI(GETARG_B(code[pc])); \
 	VM_CALL(vm_not);
@@ -780,15 +725,12 @@ static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	RABC_RDX(GETARG_B(code[pc]));
 	VM_CALL(luaV_objlen);
 	/* luaV_objlen can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -799,12 +741,10 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	/* mov %r15, %rsi */
-	APPEND3(0x4c, 0x89, 0xfe);
+	/* mov offset8(%r13), %rsi */
+	APPEND4(0x49, 0x8b, 0x75, offsetof(CallInfo, u.l.base));
 	/* mov GETARG_B(i), %edx */
 	APPEND1(0xba);
 	APPEND(GETARG_B(code[pc]), 4);
@@ -812,7 +752,6 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
 	APPEND1(0xb9);
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_concat);
-	LUA_UPDATE_BASE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -820,7 +759,6 @@ static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code
 	RABC_RDX(GETARG_A(code[pc]));
 	RABC_RCX(GETARG_B(code[pc]));
 	VM_CALL(vm_setconcat);
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -831,8 +769,6 @@ static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -841,6 +777,7 @@ static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND1(0xba);
 	APPEND(GETARG_A(code[pc]), 4);
 	VM_CALL(vm_jumpclose);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	APPEND1(X86_LJ);
 	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
   return prog;
@@ -853,14 +790,11 @@ static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
 	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(vm_eq);
-	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
 	APPEND1(0x3d);
 	APPEND(GETARG_A(code[pc]), 4);
@@ -877,14 +811,11 @@ static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
 	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_lessthan);
-	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
 	APPEND1(0x3d);
 	APPEND(GETARG_A(code[pc]), 4);
@@ -901,14 +832,11 @@ static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RKBC_RSI(GETARG_B(code[pc]), p);
 	RKBC_RDX(GETARG_C(code[pc]), p);
 	VM_CALL(luaV_lessequal);
-	LUA_UPDATE_BASE;
 	/* cmp GETARG_A(i), %eax */
 	APPEND1(0x3d);
 	APPEND(GETARG_A(code[pc]), 4);
@@ -925,8 +853,6 @@ static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	RABC_RDI(GETARG_A(code[pc]));
 	/* mov GETARG_C(i), %esi */
 	APPEND1(0xbe);
@@ -947,8 +873,6 @@ static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *cod
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -967,8 +891,6 @@ static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */ \
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
@@ -982,7 +904,6 @@ static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
 	APPEND3(0x4d, 0x89, 0xe8);
 	VM_CALL(vm_call);
 	/* vm_call can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -993,27 +914,23 @@ static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
 	APPEND3(0x4c, 0x89, 0xee);
-	/*  mov %r15, %rdx */
-	APPEND3(0x4c, 0x89, 0xfa);
-	/* movl GETARG_A(i), %ecx */
-	APPEND1(0xb9);
+	/* movl GETARG_A(i), %edx */
+	APPEND1(0xba);
 	APPEND(GETARG_A(code[pc]), 4);
-	/* movl GETARG_B(i), %r8d */
-	APPEND2(0x41, 0xb8);
+	/* movl GETARG_B(i), %ecx */
+	APPEND1(0xb9);
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_tailcall);
-	LUA_UPDATE_BASE;
+
 	/* if C function we have to Jump to next Lua return */
 	/* cmp $0x1, %eax */
 	APPEND3(0x83, 0xf8, 0x01);
 	/* jeq +offset8 */
-	APPEND2(X86_JE, 23);
+	APPEND2(X86_JE, 19);
 	RESTORE_REGISTERS;
   APPEND1(0xb8);
   APPEND(1, 4);
@@ -1029,17 +946,13 @@ static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	/* mov %r15, %rsi */
-	APPEND3(0x4c, 0x89, 0xfe);
-	RABC_RDX(GETARG_A(code[pc]));
-	/* mov %r13, %rcx */
-	APPEND3(0x4c, 0x89, 0xe9);
-	/* mov GETARG_B(i), %r8d */
-	APPEND2(0x41, 0xb8);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov %r13, %rdx */
+	APPEND3(0x4c, 0x89, 0xea);
+	/* mov GETARG_B(i), %ecx */
+	APPEND1(0xb9);
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_return);
 	RESTORE_REGISTERS;
@@ -1055,12 +968,11 @@ static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *cod
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	VM_CALL(vm_forloop);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	/* cmpl %$0x1, %eax */
 	APPEND3(0x83, 0xf8, 0x01);
 	/* je +offset */
@@ -1076,12 +988,11 @@ static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *cod
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	VM_CALL(vm_forprep);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	APPEND1(X86_LJ);
 	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
   return prog;
@@ -1094,8 +1005,6 @@ static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1105,7 +1014,6 @@ static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND1(0xb9);
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_tforcall);
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -1116,12 +1024,11 @@ static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *co
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(code[pc]));
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	VM_CALL(vm_tforloop);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	/* cmpl %$0x1, %eax */
 	APPEND3(0x83, 0xf8, 0x01);
 	APPEND2(0x0f, X86_JE+0x10);
@@ -1136,7 +1043,6 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
@@ -1154,12 +1060,8 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
 	VM_CALL(vm_setlist);
 	if (GET_OPCODE(code[pc+1]) == OP_EXTRAARG) {
 		/* jump over OP_EXTRAARG */
-		LUA_ADD_SAVEDPC(2);
-		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
-	}
-	else {
 		LUA_ADD_SAVEDPC(1);
-		APPEND2(0x90, 0x90);
+		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
 	}
   return prog;
 }
@@ -1171,21 +1073,15 @@ static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *cod
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
-	/* mov %r15, %rsi */
-	APPEND3(0x4c, 0x89, 0xfe);
-	RABC_RDX(GETARG_A(code[pc]));
-	/* mov %r13, %rcx */
-	APPEND3(0x4c, 0x89, 0xe9);
-	/* movl GETARG_Bx(i), %r8d */
-	APPEND2(0x41, 0xb8);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov %r13, %rdx */
+	APPEND3(0x4c, 0x89, 0xea);
+	/* movl GETARG_Bx(i), %ecx */
+	APPEND1(0xb9);
 	APPEND(GETARG_Bx(code[pc]), 4);
 	VM_CALL(vm_closure);
-	/* vm_closure can realloc base, reset it */
-	LUA_UPDATE_BASE;
   return prog;
 }
 
@@ -1196,22 +1092,17 @@ static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code
     unsigned int *addrs, int pc)
 {
   uint8_t *prog = bin;
-	LUA_ADD_SAVEDPC(1);
-  LUA_INC_OPCODE;
 	/* mov %rbx, %rdi */
 	APPEND3(0x48, 0x89, 0xdf);
 	/* mov %r13, %rsi */
 	APPEND3(0x4c, 0x89, 0xee);
-	/* mov %r15, %rdx */
-	APPEND3(0x4c, 0x89, 0xfa);
-	/* movl GETARG_A(i), %ecx */
-	APPEND1(0xb9);
+	/* movl GETARG_A(i), %edx */
+	APPEND1(0xba);
 	APPEND(GETARG_A(code[pc]), 4);
-	/* movl GETARG_B(i), %r8d */
-	APPEND2(0x41, 0xb8);
+	/* movl GETARG_B(i), %ecx */
+	APPEND1(0xb9);
 	APPEND(GETARG_B(code[pc]), 4);
 	VM_CALL(vm_vararg);
-	LUA_UPDATE_BASE;
   return prog;
 }
 

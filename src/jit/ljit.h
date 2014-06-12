@@ -52,19 +52,15 @@ static inline uint8_t is_imm8(int value)
 int luaJ_create(lua_State* L, Proto *p);
 void luaJ_free(lua_State* L, Proto *p);
 /* VM functions */
-void vm_setobj(lua_State* L, TValue *a, TValue *b);
-void vm_add(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
-void vm_sub(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
-void vm_mul(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
-void vm_div(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
+void vm_hook(lua_State* L);
 void vm_mod(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
 void vm_pow(lua_State* L, TValue *ra, TValue *rb, TValue *rc);
 void vm_unm(lua_State* L, TValue *ra, TValue *rb);
 void vm_gettabup(lua_State* L, int b, TValue *rkc, TValue *ra);
 void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci);
-void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx);
+void vm_closure(lua_State* L, TValue *ra, CallInfo *ci, int bx);
 void vm_settabup(lua_State* L, int a, TValue *rkb, TValue *rkc);
-int vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b);
+int vm_return(lua_State* L, TValue *ra, CallInfo *ci, int b);
 void vm_jumpclose(lua_State* L, CallInfo *ci, int a);
 void vm_newtable(lua_State* L, CallInfo *ci, TValue *ra, int b, int c);
 void vm_setupval(lua_State* L, TValue *ra, int b);
@@ -82,7 +78,7 @@ void vm_setnil(TValue *a, int b);
 void vm_not(TValue *ra, TValue *rb);
 void vm_concat(lua_State* L, TValue *base, int b, int c);
 void vm_setconcat(lua_State* L, CallInfo *ci, TValue *ra, TValue *rb);
-void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b);
-int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b);
+void vm_vararg(lua_State* L, CallInfo *ci, int a, int b);
+int vm_tailcall(lua_State* L, CallInfo *ci, int a, int b);
 int vm_testset(lua_State* L, TValue *ra, TValue *rb, int c);
 #endif

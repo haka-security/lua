@@ -73,6 +73,7 @@ int luaJ_create(lua_State* L, Proto *p)
     Instruction i = code[pc];
 
     tmp = prog;
+    prog = op_generic(prog, p, code, addrs, pc);
     prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
     addrs[pc+1] = addrs[pc] + prog - tmp;
   }
@@ -112,6 +113,7 @@ int luaJ_create(lua_State* L, Proto *p)
     Instruction i = code[pc];
 
     tmp = prog;
+    prog = op_generic(prog, p, code, addrs, pc);
     prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
     addrs[pc+1] = addrs[pc] + prog - tmp;
   }
