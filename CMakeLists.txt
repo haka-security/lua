@@ -43,7 +43,6 @@ set(LUA_LIB_SRC
 
 add_definitions(-DLUA_USE_POSIX=1)
 add_definitions(-DLUA_USE_DLOPEN=1)
-add_definitions(-DLUA_COMPAT_UNPACK=1)
 add_definitions(-DLUA_ROOT="${CMAKE_HAKA_INSTALL_PREFIX}/")
 
 add_library(liblua SHARED ${LUA_CORE_SRC} ${LUA_LIB_SRC})
