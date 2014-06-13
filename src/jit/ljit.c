@@ -180,9 +180,9 @@ static int jit_remove(lua_State *L)
 }
 
 /**
- * Jit statistics functions
+ * Jit debug functions
  */
-static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
+static inline void jit_debug_proto(lua_State *L, Proto *p, luaL_Buffer *b)
 {
   int i, sz;
   unsigned long total = 0;
@@ -190,7 +190,7 @@ static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
   char *r = luaL_prepbuffer(b);
 
   if (p->jit != NULL) {
-    sz = sprintf(r, "\n%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
         p->linedefined == 0 ? "main":"function", s,
         p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
     luaL_addsize(b, sz);
@@ -208,11 +208,29 @@ static inline void jit_print_proto(lua_State *L, Proto *p, luaL_Buffer *b)
   }
 
   for(i = 0; i < p->sizep; i++) {
-    jit_print_proto(L, p->p[i], b);
+    jit_debug_proto(L, p->p[i], b);
   }
 }
 
-static int jit_stats(lua_State *L)
+static inline void jit_list_proto(lua_State *L, Proto *p, luaL_Buffer *b)
+{
+  int i, sz;
+  const char* s = p->source ? getstr(p->source) : "?";
+  char *r = luaL_prepbuffer(b);
+
+  if (p->jit != NULL) {
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
+    luaL_addsize(b, sz);
+  }
+
+  for(i = 0; i < p->sizep; i++) {
+    jit_list_proto(L, p->p[i], b);
+  }
+}
+
+static int jit_debug(lua_State *L)
 {
   int i, n = lua_gettop(L);
   Proto *p;
@@ -223,16 +241,29 @@ static int jit_stats(lua_State *L)
     CallInfo *ci = L->ci->previous;
     if (ci && ttisLclosure(ci->func)) {
       Proto *p = clLvalue(ci->func)->p;
-      jit_print_proto(L, p, &b);
+      jit_debug_proto(L, p, &b);
     }
   }
   else {
     for (i = 1; i <= n; i++) {
       p = lua_tolfunction(L, i);
       if (p) {
-        jit_print_proto(L, p, &b);
+        jit_debug_proto(L, p, &b);
       }
     }
+  }
+  luaL_pushresult(&b);
+  return 1;
+}
+
+static int jit_list(lua_State *L)
+{
+  CallInfo *ci = L->ci->previous;
+  luaL_Buffer b;
+  luaL_buffinit(L,&b);
+  if (ci && ttisLclosure(ci->func)) {
+    Proto *p = clLvalue(ci->func)->p;
+    jit_list_proto(L, p, &b);
   }
   luaL_pushresult(&b);
   return 1;
@@ -241,7 +272,8 @@ static int jit_stats(lua_State *L)
 static const luaL_Reg jitlib[] = {
   {"add", jit_add},
   {"remove", jit_remove},
-  {"stats", jit_stats},
+  {"debug", jit_debug},
+  {"list", jit_list},
   {NULL, NULL}
 };
 
