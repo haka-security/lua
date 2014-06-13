@@ -204,7 +204,7 @@
 	/* put ci in r13 */ \
 	APPEND3(0x49, 0x89, 0xf5); \
 	\
-	/* put &savedpc in %r12 */ \
+	/* put &ci->u.l.savedpc in %r12 */ \
 	/* lea offset8(%r13),%rax */ \
 	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
 	/* mov %rax, %r12 */ \
@@ -280,7 +280,6 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
   uint8_t *prog = bin;
   TValue *rax = p->k + GETARG_Ax(code[pc+1]);
 
-	LUA_ADD_SAVEDPC(1);
 	/* Get RA in rax */
 	JIT_RABC(GETARG_A(code[pc]));
   /* mov rb->_value, %r10 */
@@ -291,8 +290,6 @@ static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code
   /* movl rax->_tt, 0x8(%rax) */
   APPEND3(0xc7, 0x40, 0x8);
   APPEND(rttype(rax), 4);
-	/* jump over the next instruction */
-	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
   return prog;
 }
 
@@ -881,6 +878,13 @@ static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *cod
 	APPEND1(0xb9);
 	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_testset);
+	/* cmpl %$0x1, %eax */
+	APPEND3(0x83, 0xf8, 0x01);
+  /* je +offset */
+  APPEND2(X86_JNE, 10); /* jump to next OP (OP_JMP) */
+  /* else jump over the next OP_JUMP */
+	LUA_ADD_SAVEDPC(1);
+	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
   return prog;
 }
 
@@ -972,11 +976,14 @@ static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *cod
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	VM_CALL(vm_forloop);
-	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	/* cmpl %$0x1, %eax */
 	APPEND3(0x83, 0xf8, 0x01);
-	/* je +offset */
-	APPEND2(0x0f, X86_JE+0x10);
+  /* je +offset */
+  APPEND2(X86_JNE, 14);
+  /* else */
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	/* jmp +offset */
+	APPEND1(X86_LJ);
 	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
   return prog;
 }
@@ -1028,10 +1035,12 @@ static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *co
 	APPEND3(0x48, 0x89, 0xdf);
 	RABC_RSI(GETARG_A(code[pc]));
 	VM_CALL(vm_tforloop);
-	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
 	/* cmpl %$0x1, %eax */
 	APPEND3(0x83, 0xf8, 0x01);
-	APPEND2(0x0f, X86_JE+0x10);
+  APPEND2(X86_JNE, 14); /* jump to next op */
+  /* else */
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	APPEND1(X86_LJ);
 	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
   return prog;
 }
@@ -1058,11 +1067,6 @@ static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *cod
 	APPEND2(0x41, 0xb9);
 	APPEND(GETARG_Ax(code[pc+1]), 4);
 	VM_CALL(vm_setlist);
-	if (GET_OPCODE(code[pc+1]) == OP_EXTRAARG) {
-		/* jump over OP_EXTRAARG */
-		LUA_ADD_SAVEDPC(1);
-		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
-	}
   return prog;
 }
 
