@@ -269,11 +269,62 @@ static int jit_list(lua_State *L)
   return 1;
 }
 
+static int jit_dump(lua_State *L)
+{
+  luaL_Buffer b;
+  Proto *p = lua_tolfunction(L, 1);
+
+  luaL_buffinit(L,&b);
+
+  if (p) {
+    const char* s = p->source ? getstr(p->source) : "?";
+    int i, pc, sz;
+    char *r;
+
+    /* dump base informations  & prologue */
+    r = luaL_prepbuffer(&b);
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes)\nJit Prologue\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit);
+    luaL_addsize(&b, sz);
+    for (i = 0; i < p->addrs[0]; i++) {
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%02x %s", p->jit[i], (i+1)%8 == 0?"\n":"");
+      luaL_addsize(&b, sz);
+    }
+    r = luaL_prepbuffer(&b);
+    sz = sprintf(r, "%s", "\n");
+    luaL_addsize(&b, sz);
+
+    /**
+     * Walk through all opcodes
+     */
+    for (pc = 1; pc <= p->sizecode; pc++) {
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%s\n", luaP_opnames[GET_OPCODE(p->code[pc-1])]);
+      luaL_addsize(&b, sz);
+      /* for this opcode, dump code */
+      for (i = p->addrs[pc-1]; i < p->addrs[pc]; i++) {
+        r = luaL_prepbuffer(&b);
+        sz = sprintf(r, "%02x %s", p->jit[i], (i-p->addrs[pc-1]+1)%8 == 0?"\n":"");
+        luaL_addsize(&b, sz);
+      }
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%s", "\n");
+      luaL_addsize(&b, sz);
+    }
+  }
+  luaL_pushresult(&b);
+  return 1;
+}
+
+
 static const luaL_Reg jitlib[] = {
   {"add", jit_add},
   {"remove", jit_remove},
   {"debug", jit_debug},
   {"list", jit_list},
+  {"dump", jit_dump},
   {NULL, NULL}
 };
 
