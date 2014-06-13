@@ -98,17 +98,13 @@ void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
   }
   else {  /* Lua function */
     LClosure *ncl = clLvalue(L->ci->func);
-    CallInfo *nci = L->ci;
     if (ncl->p->jit != NULL) {
       int offset = L->ci->u.l.savedpc - ncl->p->code;
-      printf("vm_call: offset is %d\n", offset);
       ncl->p->called++;
       L->ci->callstatus |= CIST_REENTRY;
       int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
           (void *)ncl->p->jit;
 		  jitexecute(L, L->ci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
-      offset = nci->u.l.savedpc - ncl->p->code;
-      printf("vm_call end: offset is %d\n", offset);
       return;
     }
     else {
