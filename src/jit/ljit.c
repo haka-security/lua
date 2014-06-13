@@ -301,7 +301,8 @@ static int jit_dump(lua_State *L)
      */
     for (pc = 1; pc <= p->sizecode; pc++) {
       r = luaL_prepbuffer(&b);
-      sz = sprintf(r, "%s\n", luaP_opnames[GET_OPCODE(p->code[pc-1])]);
+      sz = sprintf(r, "%s (%d)\n", luaP_opnames[GET_OPCODE(p->code[pc-1])],
+          p->addrs[pc] - p->addrs[pc-1]);
       luaL_addsize(&b, sz);
       /* for this opcode, dump code */
       for (i = p->addrs[pc-1]; i < p->addrs[pc]; i++) {
