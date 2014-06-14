@@ -276,7 +276,7 @@ static int jit_dump(lua_State *L)
 
   luaL_buffinit(L,&b);
 
-  if (p) {
+  if (p && p->jit) {
     const char* s = p->source ? getstr(p->source) : "?";
     int i, pc, sz;
     char *r;

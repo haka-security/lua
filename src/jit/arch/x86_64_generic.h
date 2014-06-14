@@ -17,7 +17,7 @@
 #define X86_JBE 0x76
 #define X86_JA  0x77
 #define X86_NJ  0xeb /* near jump */
-#define X86_LJ  0xe9 /* near jump */
+#define X86_LJ  0xe9 /* long jump */
 /*
  * Registers :
  *  %rbp : frame pointer
@@ -171,12 +171,12 @@
   /* incl (%rax) */ \
   APPEND2(0xff, 0x00);
 
-#define VM_CALL(func) \
-	/* mov func, %rax */ \
-	APPEND2(0x48, 0xb8); \
-	APPEND((uint64_t)&(func), 8); \
-	/* call func */ \
-	APPEND2(0xff, 0xd0); \
+#define VM_CALL_SZ 5
+#define VM_CALL(func) do { \
+  int32_t calloff = (unsigned char *)(func) - (prog+VM_CALL_SZ); \
+  APPEND1(0xe8); \
+  APPENDOFF(calloff); \
+} while(0);
 
 #define SAVE_REGISTERS \
 	/* mov %rbx, -8(%rbp) */ \
@@ -206,9 +206,7 @@
 	\
 	/* put &ci->u.l.savedpc in %r12 */ \
 	/* lea offset8(%r13),%rax */ \
-	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
-	/* mov %rax, %r12 */ \
-	APPEND3(0x49, 0x89, 0xc4); \
+	APPEND4(0x4d, 0x8d, 0x65, offsetof(CallInfo, u.l.savedpc)); \
 	/* jmpq *%rcx */ \
 	APPEND2(0xff, 0xe1);
 
@@ -511,7 +509,7 @@ static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 18);
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
@@ -553,7 +551,7 @@ static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 18);
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
@@ -595,7 +593,7 @@ static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 18);
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
@@ -637,7 +635,7 @@ static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
   APPEND3(0xc7, 0x46, 0x08);
   APPEND(LUA_TNUMBER, 4);
   /* jmp offset */
-  APPEND2(X86_NJ, 18);
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
   /* --> Offset : mov    TM_ADD,%r8d */
   APPEND2(0x41, 0xb8);
   APPEND(TM_ADD, 4);
