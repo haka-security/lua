@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.c,v 2.155 2013/03/16 21:10:18 roberto Exp $
+** $Id: lvm.c,v 2.155.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -57,7 +57,7 @@ int luaV_tostring (lua_State *L, StkId obj) {
 }
 
 
-static void traceexec (lua_State *L) {
+void traceexec (lua_State *L) {
   CallInfo *ci = L->ci;
   lu_byte mask = L->hookmask;
   int counthook = ((mask & LUA_MASKCOUNT) && L->hookcount == 0);
@@ -541,10 +541,19 @@ void luaV_execute (lua_State *L) {
   k = cl->p->k;
   base = ci->u.l.base;
 #ifdef LUA_USE_JIT
-  if (lua_getjit(L) && cl->p->jit != NULL) {
-		void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
-              TValue *k) = (void *)cl->p->jit;
-		return jitexecute(L, ci, cl, k);
+  if (cl->p->jit != NULL) {
+    cl->p->called++;
+    int offset = ci->u.l.savedpc - cl->p->code;
+		int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
+              (void *)cl->p->jit;
+		if (jitexecute(L, ci, cl, cl->p->jit+cl->p->addrs[offset])) {
+      offset = ci->u.l.savedpc - cl->p->code;
+      ci = L->ci;
+      goto newframe;
+    }
+    else {
+      return;
+    }
   }
 #endif
   /* main loop of interpreter */

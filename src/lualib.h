@@ -1,5 +1,5 @@
 /*
-** $Id: lualib.h,v 1.43 2011/12/08 12:11:37 roberto Exp $
+** $Id: lualib.h,v 1.43.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Lua standard libraries
 ** See Copyright Notice in lua.h
 */
@@ -41,6 +41,10 @@ LUAMOD_API int (luaopen_debug) (lua_State *L);
 #define LUA_LOADLIBNAME	"package"
 LUAMOD_API int (luaopen_package) (lua_State *L);
 
+#ifdef LUA_USE_JIT
+#define LUA_JITLIBNAME	"jit"
+LUAMOD_API int (luaopen_jit) (lua_State *L);
+#endif
 
 /* open all previous libraries */
 LUALIB_API void (luaL_openlibs) (lua_State *L);

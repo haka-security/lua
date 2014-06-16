@@ -28,127 +28,20 @@
 #define luai_runtimecheck(L, c)		/* void */
 #endif
 
-static void PrintJitString(const TString* ts)
+
+void vm_hook(lua_State* L)
 {
- const char* s=getstr(ts);
- size_t i,n=ts->tsv.len;
- printf("%c",'"');
- for (i=0; i<n; i++)
- {
-  int c=(int)(unsigned char)s[i];
-  switch (c)
-  {
-   case '"':  printf("\\\""); break;
-   case '\\': printf("\\\\"); break;
-   case '\a': printf("\\a"); break;
-   case '\b': printf("\\b"); break;
-   case '\f': printf("\\f"); break;
-   case '\n': printf("\\n"); break;
-   case '\r': printf("\\r"); break;
-   case '\t': printf("\\t"); break;
-   case '\v': printf("\\v"); break;
-   default:	if (isprint(c))
-   			printf("%c",c);
-		else
-			printf("\\%03d",c);
+  if ((L->hookmask & (LUA_MASKLINE | LUA_MASKCOUNT)) &&
+      (--L->hookcount == 0 || L->hookmask & LUA_MASKLINE)) {
+    traceexec(L);
   }
- }
- printf("%c",'"');
 }
 
-
-void PrintJitValue(TValue* o)
-{
- switch (ttype(o))
- {
-  case LUA_TNIL:
-    printf("nil");
-    break;
-  case LUA_TBOOLEAN:
-    printf(bvalue(o) ? "true" : "false");
-    break;
-  case LUA_TNUMBER:
-    printf(LUA_NUMBER_FMT,nvalue(o));
-    break;
-  case LUA_TSTRING:
-    PrintJitString(rawtsvalue(o));
-    break;
-  case LUA_TTABLE:
-	printf("Table");
-	break;
-  default:              /* cannot happen */
-    printf("? type=%d",ttype(o));
-    break;
- }
-}
-
-void vm_setobj(lua_State* L, TValue *a, TValue *b)
-{
-	a->value_ = b->value_;
-	a->tt_ = b->tt_;
-	checkliveness(G(L),a);
-}
-
-void vm_setbool(TValue *a, int b)
-{
-	val_(a).b=(b); settt_(a, LUA_TBOOLEAN);
-}
-
-void vm_setnil(TValue *a, int b)
-{
-	TValue *ra = a;
-	int rb = b;
-	do {
-		setnilvalue(ra++);
-	} while(rb--);
-}
 
 void vm_not(TValue *ra, TValue *rb)
 {
 	int res = l_isfalse(rb);  /* next assignment may change this value */
 	setbvalue(ra, res);
-}
-
-void vm_add(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numadd(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_ADD);
-	}
-}
-void vm_sub(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numsub(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_SUB);
-	}
-}
-
-void vm_mul(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_nummul(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_MUL);
-	}
-}
-void vm_div(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
-{
-	if (ttisnumber(rb) && ttisnumber(rc)) {
-		lua_Number nb = nvalue(rb), nc = nvalue(rc);
-		setnvalue(ra, luai_numdiv(L, nb, nc));
-	}
-	else {
-		luaV_arith(L, ra, rb, rc, TM_DIV);
-	}
 }
 void vm_mod(lua_State* L, TValue *ra, TValue *rb, TValue *rc)
 {
@@ -197,61 +90,63 @@ void vm_settabup(lua_State* L, int a, TValue *rkb, TValue *rkc)
 
 void vm_call(lua_State* L, TValue *ra, int b, int c, CallInfo *ci)
 {
-        int nresults = c - 1;
+  int nresults = c - 1;
 
-        if (b != 0) L->top = ra+b;  /* else previous instruction set top */
-        if (luaD_precall(L, ra, nresults)) {  /* C function? */
-          if (nresults >= 0) L->top = ci->top;  /* adjust results */
-        }
-        else {  /* Lua function */
-			CallInfo *nci = L->ci;
-		    LClosure *ncl;
-			TValue *nk;
-		    ncl = clLvalue(nci->func);
-			nk = ncl->p->k;
-			nci->callstatus |= CIST_REENTRY;
-			if (ncl->p->jit != NULL) {
-				void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
-					TValue *k) = (void *)ncl->p->jit;
-				return jitexecute(L, nci, ncl, nk);
-			}
-        }
+  if (b != 0) L->top = ra+b;  /* else previous instruction set top */
+  if (luaD_precall(L, ra, nresults)) {  /* C function? */
+    if (nresults >= 0) L->top = ci->top;  /* adjust results */
+  }
+  else {  /* Lua function */
+    LClosure *ncl = clLvalue(L->ci->func);
+    if (ncl->p->jit != NULL) {
+      int offset = L->ci->u.l.savedpc - ncl->p->code;
+      ncl->p->called++;
+      L->ci->callstatus |= CIST_REENTRY;
+      int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
+          (void *)ncl->p->jit;
+		  jitexecute(L, L->ci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
+      return;
+    }
+    else {
+      luaV_execute(L);
+    }
+  }
 }
 
-void vm_closure(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int bx)
+void vm_closure(lua_State* L, TValue *ra, CallInfo *ci, int bx)
 {
 	LClosure *cl = clLvalue(ci->func);
-    Proto *p = cl->p->p[bx];
-    Closure *ncl = getcached(p, cl->upvals, base);  /* cached closure */
+  Proto *p = cl->p->p[bx];
+  TValue *base = ci->u.l.base;
+  Closure *ncl = getcached(p, cl->upvals, base);  /* cached closure */
 
-    if (ncl == NULL)  /* no match? */
-      pushclosure(L, p, cl->upvals, base, ra);  /* create a new one */
-    else
-      setclLvalue(L, ra, ncl);  /* push cashed closure */
+  if (ncl == NULL)  /* no match? */
+    pushclosure(L, p, cl->upvals, base, ra);  /* create a new one */
+  else
+    setclLvalue(L, ra, ncl);  /* push cashed closure */
 	luaC_condGC(L,{L->top = ra+1;  /* limit of live values */ \
                    luaC_step(L); \
                    L->top = ci->top;})  /* restore top */ \
-    luai_threadyield(L);
+  luai_threadyield(L);
 }
 
-void vm_return(lua_State* L, TValue *base, TValue *ra, CallInfo *ci, int b)
+int vm_return(lua_State* L, TValue *ra, CallInfo *ci, int b)
 {
-	CallInfo *nci;
 	int nb = 0;
 	LClosure *cl = clLvalue(ci->func);
+  TValue *base = ci->u.l.base;
 
 	if (b != 0) L->top = ra+b-1;
 	if (cl->p->sizep > 0) luaF_close(L, base);
 	nb = luaD_poscall(L, ra);
 	if (!(ci->callstatus & CIST_REENTRY)) { /* 'ci' still the called one */
-		return;  /* external invocation: return */
+		return 0;  /* external invocation: return */
 	}
 	else {  /* invocation via reentry: continue execution */
-		nci = L->ci;
-		if (nb) L->top = nci->top;
-		lua_assert(isLua(nci));
-		lua_assert(GET_OPCODE(*((nci)->u.l.savedpc - 1)) == OP_CALL);
-		return;
+		if (nb) L->top = L->ci->top;
+		lua_assert(isLua(L->ci));
+		lua_assert(GET_OPCODE(*((L->ci)->u.l.savedpc - 1)) == OP_CALL);
+		return 1;
 	}
 }
 
@@ -404,9 +299,10 @@ void vm_setconcat(lua_State* L, CallInfo *ci, TValue *ra, TValue *rb)
 	L->top = ci->top;  /* restore top */
 }
 
-void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
+void vm_vararg(lua_State* L, CallInfo *ci, int a, int b)
 {
 	LClosure *cl = clLvalue(ci->func);
+  TValue *base = ci->u.l.base;
 	int nb = b - 1;
 	int j;
 	int n = cast_int(base - ci->func) - cl->p->numparams - 1;
@@ -428,10 +324,10 @@ void vm_vararg(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 	}
 }
 
-int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
+int vm_tailcall(lua_State* L, CallInfo *ci, int a, int b)
 {
 	LClosure *cl = clLvalue(ci->func);
-	TValue *ra = base+a;
+	TValue *ra = (ci->u.l.base)+a;
 
 	if (b != 0) L->top = ra+b;  /* else previous instruction set top */
 
@@ -441,7 +337,6 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 	else {
 		int aux;
 		LClosure *ncl;
-		TValue *nk;
 
 		/* tail call: put called frame (n) in place of caller one (o) */
 		CallInfo *nci = L->ci;  /* called frame */
@@ -466,13 +361,17 @@ int vm_tailcall(lua_State* L, CallInfo *ci, TValue *base, int a, int b)
 		 */
 		nci = L->ci = oci;  /* remove new frame */
 		ncl = clLvalue(nci->func);
-		nk = ncl->p->k;
-		luaJ_init_offset(nci);
+    if (!ncl->p->jit) luaJ_create(L, ncl->p);
 		if (ncl->p->jit != NULL) {
-			void (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl,
-				TValue *k) = (void *)ncl->p->jit;
-			jitexecute(L, nci, ncl, nk);
+      unsigned int offset = nci->u.l.savedpc - ncl->p->code;
+      ncl->p->called++;
+			int (*jitexecute)(lua_State* L, CallInfo *ci, LClosure *cl, unsigned char *start) =
+				(void *)ncl->p->jit;
+			jitexecute(L, nci, ncl, ncl->p->jit+ncl->p->addrs[offset]);
 		}
+    else {
+      luaV_execute(L);
+    }
 	}
 	return 0;
 }

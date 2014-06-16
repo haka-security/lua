@@ -1,5 +1,5 @@
 /*
-** $Id: lstate.h,v 2.82 2012/07/02 13:37:04 roberto Exp $
+** $Id: lstate.h,v 2.82.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Global State
 ** See Copyright Notice in lua.h
 */
@@ -77,7 +77,6 @@ typedef struct CallInfo {
     struct {  /* only for Lua functions */
       StkId base;  /* base for this function */
       const Instruction *savedpc;
-      ptrdiff_t jitoffset;
     } l;
     struct {  /* only for C functions */
       int ctx;  /* context info. in case of yields */
@@ -146,9 +145,6 @@ typedef struct global_State {
   TString *memerrmsg;  /* memory-error message */
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
-#ifdef LUA_USE_JIT
-  int jitenable;
-#endif
 } global_State;
 
 

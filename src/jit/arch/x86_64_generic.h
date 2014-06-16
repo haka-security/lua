@@ -7,6 +7,8 @@
 #ifndef __x86_64_generic_h__
 #define __x86_64_generic_h__
 
+#define OP_SZ_MAX 110
+
 /* Jumps constants */
 #define X86_JB  0x72
 #define X86_JAE 0x73
@@ -15,849 +17,1151 @@
 #define X86_JBE 0x76
 #define X86_JA  0x77
 #define X86_NJ  0xeb /* near jump */
-#define X86_LJ  0xe9 /* near jump */
+#define X86_LJ  0xe9 /* long jump */
 /*
  * Registers :
  *  %rbp : frame pointer
  *  %rax : scratch register
  *  %r10 : scratch register
  *  %rbx : L (Lua state) callee saved register
- *  %r12 : &savedpc
+ *  %r12 : &savedpc callee saved register
  *  %r13 : ci (Call Info) callee saved register
- *  %r14 : k (constant base) callee saved register
- *  %r15 : base (stack base) callee saved register
  *
  * ABI: %rdi, %rsi, %rdx, %rcx, %r8, %r9
  *
  * Stack:
- *  -8(%rbp):saved %rax register
- *  -16(%rbp): saved %rbx callee saved register
- *  -24(%rbp): saved %r12 callee saved register
- *  -32(%rbp): saved %r13 callee saved register
- *  -40(%rbp): saved %r14 callee saved register
- *  -48(%rbp): saved %r15 callee saved register
- *  -56(%rbp): jit code pointer
- *  -64(%rbp): jitoffset address
+ *  -8(%rbp): saved %rbx callee saved register
+ *  -16(%rbp): saved %r12 callee saved register
+ *  -24(%rbp): saved %r13 callee saved register
+ *
+ * Call:
+ *  %rdi: Lua state
+ *  %rsi: CallInfo struct
+ *  %rdx: Closure struct
+ *  %rcx: offset for prologue jump
  */
 
+#define NOP  APPEND1(0x90);
+
 #define RABC_RDI(arg) \
-	/* mov %r15, %rdi */\
-	APPEND3(0x4c, 0x89, 0xff);\
+  /* mov offset8(%r13), %rdi*/ \
+  APPEND4(0x49, 0x8b, 0x7d, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rdi */ \
 	APPEND3(0x48, 0x81, 0xc7);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RDI(arg) \
+#define RK_RDI(k) APPEND2(0x48, 0xbf);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RDI(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rdi */ \
-		APPEND3(0x4c, 0x89, 0xf7);\
-		/* add INDEXK(arg)*sizeof(TValue), %rdi */\
-		APPEND3(0x48, 0x81, 0xc7);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RDI(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RDI(arg); \
 	}
 
 #define RABC_RSI(arg) \
-	/* mov %r15, %rsi */\
-	APPEND3(0x4c, 0x89, 0xfe);\
+  /* mov offset8(%r13), %rsi*/ \
+  APPEND4(0x49, 0x8b, 0x75, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rsi */ \
 	APPEND3(0x48, 0x81, 0xc6);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RSI(arg) \
+#define RK_RSI(k) APPEND2(0x48, 0xbe);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RSI(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rsi */ \
-		APPEND3(0x4c, 0x89, 0xf6);\
-		/* add INDEXK(arg)*sizeof(TValue), %rsi */\
-		APPEND3(0x48, 0x81, 0xc6);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RSI(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RSI(arg); \
 	}
 
 #define RABC_RDX(arg) \
-	/* mov %r15, %rdx */\
-	APPEND3(0x4c, 0x89, 0xfa);\
+  /* mov offset8(%r13), %rdx */ \
+  APPEND4(0x49, 0x8b, 0x55, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rdx */ \
 	APPEND3(0x48, 0x81, 0xc2);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RDX(arg) \
+#define RK_RDX(k) APPEND2(0x48, 0xba);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RDX(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rdx */ \
-		APPEND3(0x4c, 0x89, 0xf2);\
-		/* add INDEXK(arg)*sizeof(TValue), %rdx */\
-		APPEND3(0x48, 0x81, 0xc2);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RDX(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RDX(arg); \
 	}
 
 #define RABC_RCX(arg) \
-	/* mov %r15, %rcx */\
-	APPEND3(0x4c, 0x89, 0xf9);\
+  /* mov offset8(%r13), %rcx */ \
+  APPEND4(0x49, 0x8b, 0x4d, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %rcx */ \
 	APPEND3(0x48, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_RCX(arg) \
+#define RK_RCX(k) APPEND2(0x48, 0xb9);APPEND((uint64_t)(k), 8);
+
+#define RKBC_RCX(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %rcx */ \
-		APPEND3(0x4c, 0x89, 0xf1);\
-		/* add INDEXK(arg)*sizeof(TValue), %rcx */\
-		APPEND3(0x48, 0x81, 0xc1);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_RCX(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_RCX(arg); \
 	}
 
 #define RABC_R8(arg) \
-	/* mov %r15, %r8 */\
-	APPEND3(0x4d, 0x89, 0xf8);\
+  /* mov offset8(%r13), %r8 */ \
+  APPEND4(0x4d, 0x8b, 0x45, offsetof(CallInfo, u.l.base)); \
 	/* add (arg)*sizeof(TValue), %r8 */ \
 	APPEND3(0x49, 0x81, 0xc0);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_R8(arg) \
+#define RK_R8(k) APPEND2(0x49, 0xb8);APPEND((uint64_t)(k), 8);
+
+#define RKBC_R8(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %r8 */ \
-		APPEND3(0x4d, 0x89, 0xf0);\
-		/* add INDEXK(arg)*sizeof(TValue), %r8 */\
-		APPEND3(0x49, 0x81, 0xc0);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_R8(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_R8(arg); \
 	}
 
 #define RABC_R9(arg) \
-	/* mov %r15, %r8 */\
-	APPEND3(0x4c, 0x89, 0xf9);\
-	/* add (arg)*sizeof(TValue), %r8 */ \
+  /* mov offset8(%r13), %r9 */ \
+  APPEND4(0x4d, 0x8b, 0x4d, offsetof(CallInfo, u.l.base)); \
+	/* add (arg)*sizeof(TValue), %r9 */ \
 	APPEND3(0x49, 0x81, 0xc1);\
 	APPEND((arg)*sizeof(TValue), 4);
 
-#define RKBC_R9(arg) \
+#define RK_R9(k) APPEND2(0x49, 0xb9);APPEND((uint64_t)(k), 8);
+
+#define RKBC_R9(arg, p) \
 	if (ISK(arg)) { \
-		/* k+INDEXK(arg)*sizeof(Tvalue) */\
-		/* mov %r14, %r8 */ \
-		APPEND3(0x4d, 0x89, 0xf1);\
-		/* add INDEXK(arg)*sizeof(TValue), %r8 */\
-		APPEND3(0x49, 0x81, 0xc1);\
-		APPEND(INDEXK(arg)*sizeof(TValue), 4);\
+    RK_R9(&p->k[INDEXK(arg)]); \
 	}\
 	else { \
 		RABC_R9(arg); \
 	}
 
 #define JIT_RABC(arg) { \
-	/* mov %r15, %rax */\
-	APPEND3(0x4c, 0x89, 0xf8);\
-    /* add arg*sizeof(TValue), %rax*/\
-    APPEND2(0x48, 0x05);\
-    APPEND((arg)*sizeof(TValue), 4);\
+  /* mov offset8(%r13), %rax */ \
+  APPEND4(0x49, 0x8b, 0x45, offsetof(CallInfo, u.l.base)); \
+  /* add arg*sizeof(TValue), %rax*/\
+  APPEND2(0x48, 0x05);\
+  APPEND((arg)*sizeof(TValue), 4);\
 }
 
-#define LUA_UPDATE_BASE \
-	/* mov offset8(%r13),%r15 */ \
-	APPEND4(0x4d, 0x8b, 0x7d, offsetof(CallInfo, u.l.base));
-
+/**
+ * Increment savedpc used in lvm.c
+ */
 #define LUA_ADD_SAVEDPC(arg) \
 	/* addq arg*sizeof(Instrcution) (%r12) */ \
 	APPEND4(0x49, 0x81, 0x04, 0x24); \
 	APPEND((arg)*sizeof(Instruction), 4);
 
-#define VM_CALL(func) \
-	/* mov func, %rax */ \
-	APPEND2(0x48, 0xb8); \
-	APPEND((uint64_t)&(func), 8); \
-	/* call func */ \
-	APPEND2(0xff, 0xd0); \
+/**
+ * Increment lua opcode count, used by stats
+ */
+#define LUA_INC_OPCODE \
+  /* mov &p->opcodes[GET_OPCODE(code[pc])),%rax */ \
+  APPEND2(0x48, 0xb8); \
+  APPEND((uint64_t)&p->opcodes[GET_OPCODE(code[pc])], 8); \
+  /* incl (%rax) */ \
+  APPEND2(0xff, 0x00);
 
-#define JIT_UPDATEOFFSET(off) \
-	/* mov -64(%rbp), %rax*/ \
-	APPEND4(0x48, 0x8b, 0x45, 0xc0); \
-	/* movl off, (%rax) */ \
-	APPEND2(0xc7, 0x00); \
-	APPEND(off, 4);
+#define VM_CALL_SZ 5
+#define VM_CALL(func) do { \
+  int32_t calloff = (unsigned char *)(func) - (prog+VM_CALL_SZ); \
+  APPEND1(0xe8); \
+  APPENDOFF(calloff); \
+} while(0);
 
 #define SAVE_REGISTERS \
-	/* mov %rax, -8(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xf8); \
-	/* mov %rbx, -16(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x5d, 0xf0); \
-	/* mov %r12, -24(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x65, 0xe8); \
-	/* mov %r13, -32(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x6d, 0xe0); \
-	/* mov %r14, -40(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x75, 0xd8); \
-	/* mov %r15, -48(%rbp) */ \
-	APPEND4(0x4c, 0x89, 0x7d, 0xd0);
+	/* mov %rbx, -8(%rbp) */ \
+	APPEND4(0x48, 0x89, 0x5d, 0xf8); \
+	/* mov %r12, -16(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x65, 0xf0); \
+	/* mov %r13, -24(%rbp) */ \
+	APPEND4(0x4c, 0x89, 0x6d, 0xe8); \
 
 #define RESTORE_REGISTERS \
-	/* mov -8(%rbp), %rax */ \
-	APPEND4(0x48, 0x8b, 0x45, 0xf8); \
-	/* mov -16(%rbp), %rbx */ \
-	APPEND4(0x48, 0x8b, 0x5d, 0xf0); \
-	/* mov -24(%rbp), %r12 */ \
-	APPEND4(0x4c, 0x8b, 0x65, 0xe8); \
-	/* mov -32(%rbp), %r13 */ \
-	APPEND4(0x4c, 0x8b, 0x6d, 0xe0); \
-	/* mov -40(%rbp), %r14 */ \
-	APPEND4(0x4c, 0x8b, 0x75, 0xd8); \
-	/* mov -48(%rbp), %r15 */ \
-	APPEND4(0x4c, 0x8b, 0x7d, 0xd0);
+	/* mov -8(%rbp), %rbx */ \
+	APPEND4(0x48, 0x8b, 0x5d, 0xf8); \
+	/* mov -16(%rbp), %r12 */ \
+	APPEND4(0x4c, 0x8b, 0x65, 0xf0); \
+	/* mov -24(%rbp), %r13 */ \
+	APPEND4(0x4c, 0x8b, 0x6d, 0xe8); \
 
-
-static int jit_opcodes[NUM_OPCODES] =
-{
-	40, /* OP_MOVE */
-	41, /* OP_LOADK */
-	43, /* OP_LOADKX */
-	34, /* OP_LOADBOOL */
-	35, /* OP_LOADNIL */
-	38, /* OP_GETUPVAL */
-	52, /* OP_GETTABUP */
-	57, /* OP_GETTABLE */
-	52, /* OP_SETTABUP */
-	38, /* OP_SETUPVAL */
-	57, /* OP_SETTABLE */
-	51, /* OP_NEWTABLE */
-	57, /* OP_SELF */
-	57, /* OP_ADD */
-	57,	/* OP_SUB */
-	57, /* OP_MUL */
-	57, /* OP_DIV */
-	57, /* OP_MOD */
-	57, /* OP_POW */
-	47, /* OP_UNM */
-	40, /* OP_NOT */
-	47, /* OP_LEN */
-	82, /* OP_CONCAT */
-	36, /* OP_JMP */
-	64, /* OP_EQ */
-	64, /* OP_LT */
-	64, /* OP_LE */
-	50, /* OP_TEST */
-	40, /* OP_TESTSET */
-	60, /* OP_CALL */
-	85, /* OP_TAILCALL */
-	81, /* OP_RETURN */
-	42, /* OP_FORLOOP */
-	38, /* OP_FORPREP */
-	45, /* OP_TFORCALL */
-	42, /* OP_TFORLOOP */
-	55, /* OP_SETLIST */
-	49, /* OP_CLOSURE */
-	44, /* OP_VARARG */
-	1, /* OP_EXTRAARG */
-};
-
-#define PROLOGUE_LEN 89
 #define JIT_PROLOGUE \
 	APPEND4(0x55, 0x48, 0x89, 0xe5); /* push %rbp; mov %rsp,%rbp */ \
-	APPEND4(0x48, 0x83, 0xec, 80);    /* subq  $72,%rsp       */ \
+	APPEND4(0x48, 0x83, 0xec, 32);    /* subq  $24,%rsp       */ \
 	/* First, save registers */ \
 	SAVE_REGISTERS; \
 	/* put L in %rbx */ \
 	APPEND3(0x48, 0x89, 0xfb); /* mov %rdi, %rbx */ \
 	/* put ci in r13 */ \
 	APPEND3(0x49, 0x89, 0xf5); \
-	/* put k in r14 */ \
-	APPEND3(0x49, 0x89, 0xce); /* mov %rcx, %r14 */ \
-	/* put base in r15 */ \
-	LUA_UPDATE_BASE; \
 	\
-	/* put &savedpc %r12 */ \
+	/* put &ci->u.l.savedpc in %r12 */ \
 	/* lea offset8(%r13),%rax */ \
-	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.savedpc)); \
-	/* mov %rax, %r12 */ \
-	APPEND3(0x49, 0x89, 0xc4); \
-	\
-	/* put code in stack: -64(%rbp) */ \
-	/* mov offset8(%rdx), %r10 */ \
-	APPEND4(0x4c, 0x8b, 0x52, offsetof(LClosure, p)); \
-	/* mov offset8(%r10), %r10 */ \
-	APPEND4(0x4d, 0x8b, 0x52, offsetof(Proto, code)); \
-	/* mov %r10, -56(%rbp) */  \
-	APPEND4(0x4c, 0x89, 0x55, 0xc8); \
-	\
-	/* put &jitoffset in stack: -64(%rbp)  */ \
-	/* lea offset8(%r13),%rax */ \
-	APPEND4(0x49, 0x8d, 0x45, offsetof(CallInfo, u.l.jitoffset)); \
-	/* mov %rax,-64(%rbp) */ \
-	APPEND4(0x48, 0x89, 0x45, 0xc0); \
-	\
-	/* Prepare initial Jump for coroutine (%rax) is now jitoffset */ \
-	/* mov offset8(%rdx), %r10 */ \
-	APPEND4(0x4c, 0x8b, 0x52, offsetof(LClosure, p)); \
-	/* mov offset32(%r10), %r10 */ \
-	APPEND3(0x4d, 0x8b, 0x92); \
-	APPEND(offsetof(Proto, jit), 4); \
-	/* add (%rax), %r10 */ \
-	APPEND3(0x4c, 0x03, 0x10); \
-	/* jmpq %r10 */ \
-	APPEND3(0x41, 0xff, 0xe2);
+	APPEND4(0x4d, 0x8d, 0x65, offsetof(CallInfo, u.l.savedpc)); \
+	/* jmpq *%rcx */ \
+	APPEND2(0xff, 0xe1);
 
-#define JIT_OP_RETURN \
-	LUA_ADD_SAVEDPC(1); \
-	JIT_UPDATEOFFSET(addrs[pc+1]); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r15, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xfe); \
-	RABC_RDX(GETARG_A(i)); \
-	/* mov %r13, %rcx */ \
-	APPEND3(0x4c, 0x89, 0xe9); \
-	/* mov GETARG_B(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_return); \
-	RESTORE_REGISTERS; \
-	/* leaveq; retq */ \
-	APPEND2(0xc9, 0xc3); \
 
-#define JIT_OP_LOADK \
-	LUA_ADD_SAVEDPC(1); \
-	/* Get RA in rax */ \
-	JIT_RABC(GETARG_A(i)); \
-	/* Get RB */ \
-	/* mov %r14, %rdx */ \
-	APPEND3(0x4c, 0x89, 0xf2); \
-	/* add GETARG_Bx(i)*sizeof(TValue), %rdx */ \
-	APPEND3(0x48, 0x81, 0xc2); \
-	APPEND(GETARG_Bx(i)*sizeof(TValue), 4); \
-	/* mov (%rdx), %r10 */ \
-	APPEND3(0x4c, 0x8b, 0x12); \
-	/* mov %r10, (%rax) */ \
-	APPEND3(0x4c, 0x89, 0x10); \
-	/* mov 0x08(%rdx), %r10d */ \
-	APPEND4(0x44, 0x8b, 0x52, 0x08); \
-	/* mov %r10d, 0x8(%rax) */ \
-	APPEND4(0x44, 0x89, 0x50, 0x08);
+/**
+ * Generic
+ */
+static inline uint8_t *op_generic(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	LUA_ADD_SAVEDPC(1);
+  LUA_INC_OPCODE;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+  VM_CALL(vm_hook);
+  return prog;
+}
 
-#define JIT_OP_LOADKX \
-	LUA_ADD_SAVEDPC(2); \
-	/* Get RA */ \
-	JIT_RABC(GETARG_A(i)); \
-	/* mov r14, %rdx */ \
-	APPEND3(0x4c, 0x89, 0xf2); \
-	/* add GETARG_Bx(i)*sizeof(TValue), %rdx */ \
-	APPEND3(0x48, 0x81, 0xc2); \
-	APPEND(GETARG_Ax(c[pc+1])*sizeof(TValue), 4); \
-	/* mov (%rdx), %r10 */ \
-	APPEND3(0x4c, 0x8b, 0x12); \
-	/* mov %r10, (%rax) */ \
-	APPEND3(0x4c, 0x89, 0x10); \
-	/* mov 0x08(%rdx), %r10d */ \
-	APPEND4(0x44, 0x8b, 0x52, 0x08); \
-	/* mov %r10d, 0x8(%rax) */ \
-	APPEND4(0x44, 0x89, 0x50, 0x08); \
-	/* jump over the next instruction */ \
-	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]); \
 
-#define JIT_OP_LOADBOOL \
-	RABC_RDI(GETARG_A(i)); \
-	/* mov GETARG_B(i), %esi */ \
-	APPEND1(0xbe); \
-	APPEND(GETARG_B(i), 4); \
-	/* mov %esi, (%rdi) */ \
-	APPEND2(0x89, 0x37); \
-	/* movl   LUA_TBOOLEAN,0x8(%rdi) */ \
-	APPEND3(0xc7, 0x47, 0x08); \
-	APPEND(LUA_TBOOLEAN, 4); \
-	if (GETARG_C(i)) { \
-		LUA_ADD_SAVEDPC(2); \
-		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]); \
-	} \
-	else { \
-		LUA_ADD_SAVEDPC(1); \
-		APPEND2(0x90, 0x90); \
+
+/**
+ * OP_MOVE opcode
+ */
+static uint8_t *op_move_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	RABC_RSI(GETARG_A(code[pc]));
+	RABC_RDX(GETARG_B(code[pc]));
+	/* mov (%rdx), %rax */
+	APPEND3(0x48, 0x8b, 0x02);
+	/* mov %rax, (%rsi) */
+	APPEND3(0x48, 0x89, 0x06);
+	/* mov 0x08(%rdx), %eax */
+	APPEND3(0x8b, 0x42, 0x08);
+	/* mov %eax, 0x08(%rsi) */
+	APPEND3(0x89, 0x46, 0x08);
+  return prog;
+}
+
+/**
+ * OP_LOADK opcode
+ */
+static uint8_t *op_loadk_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+  TValue *rb = p->k + GETARG_Bx(code[pc]);
+	/* Get RA in rax */
+  JIT_RABC(GETARG_A(code[pc]));
+  /* mov rb->_value, %r10 */
+  APPEND2(0x49, 0xba);
+  APPEND((uint64_t)val_(rb).p, 8);
+	/* mov %r10, (%rax) */
+	APPEND3(0x4c, 0x89, 0x10);
+  /* movl rb->_tt, 0x8(%rax) */
+  APPEND3(0xc7, 0x40, 0x8);
+  APPEND(rttype(rb), 4);
+  return prog;
+}
+
+/**
+ * OP_LOADKX opcode
+ */
+static uint8_t *op_loadkx_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+  TValue *rax = p->k + GETARG_Ax(code[pc+1]);
+
+	/* Get RA in rax */
+	JIT_RABC(GETARG_A(code[pc]));
+  /* mov rb->_value, %r10 */
+  APPEND2(0x49, 0xba);
+  APPEND((uint64_t)val_(rax).p, 8);
+  /* mov %r10, (%rax) */
+  APPEND3(0x4c, 0x89, 0x10);
+  /* movl rax->_tt, 0x8(%rax) */
+  APPEND3(0xc7, 0x40, 0x8);
+  APPEND(rttype(rax), 4);
+  return prog;
+}
+
+/**
+ * OP_LOADBOOL opcode
+ */
+static inline uint8_t *op_loadbool_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	RABC_RDI(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %esi */
+	APPEND1(0xbe);
+	APPEND(GETARG_B(code[pc]), 4);
+	/* mov %esi, (%rdi) */
+	APPEND2(0x89, 0x37);
+	/* movl   LUA_TBOOLEAN,0x8(%rdi) */
+	APPEND3(0xc7, 0x47, 0x08);
+	APPEND(LUA_TBOOLEAN, 4);
+	if (GETARG_C(code[pc])) {
+		LUA_ADD_SAVEDPC(1);
+		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
 	}
+  return prog;
+}
 
-#define JIT_OP_LOADNIL \
-	LUA_ADD_SAVEDPC(1); \
-	RABC_RDI(GETARG_A(i)); \
-	/* mov GETARG_B(i), %esi */ \
-	APPEND1(0xbe); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_setnil);
+/**
+ * OP_LOADNIL opcode
+ */
+static uint8_t *op_loadnil_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+  int b = GETARG_B(code[pc]);
 
-#define JIT_OP_NOT \
-	LUA_ADD_SAVEDPC(1); \
-	RABC_RDI(GETARG_A(i)); \
-	RABC_RSI(GETARG_B(i)); \
-	VM_CALL(vm_not);
+	RABC_RDI(GETARG_A(code[pc]));
+  do {
+    /* movl $0x0, offset(%rdi) */
+    APPEND3(0xc7, 0x47, offsetof(TValue, tt_));
+    APPEND(0x0, 4);
+    /* add sizeof(TValue), %rdi */
+    APPEND4(0x48, 0x83, 0xc7, sizeof(TValue));
+  } while(b--);
+  return prog;
+}
 
-#define JIT_OP_ADD \
-	LUA_ADD_SAVEDPC(1); \
+/**
+ * OP_GETUPVAL opcode
+ */
+static uint8_t *op_getupval_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_B(code[pc]), 4);
+	VM_CALL(vm_getupval);
+  return prog;
+}
+
+/**
+ * OP_GETTABUP opcode
+ */
+static uint8_t *op_gettabup_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov GETARG_B(i), %esi */
+	APPEND1(0xbe);
+	APPEND(GETARG_B(code[pc]), 4);
+	RKBC_RDX(GETARG_C(code[pc]), p);
+	RABC_RCX(GETARG_A(code[pc]));
+	VM_CALL(vm_gettabup);
+	/* vm_gettabup can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_GETTABLE opcode
+ */
+static uint8_t *op_gettable_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_B(code[pc]));
+	RKBC_RDX(GETARG_C(code[pc]), p);
+	RABC_RCX(GETARG_A(code[pc]));
+	VM_CALL(luaV_gettable);
+	/* luaV_gettable can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_SETTABUP opcode
+ */
+static uint8_t *op_settabup_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov GETARG_A(i), %esi */
+	APPEND1(0xbe);
+	APPEND(GETARG_A(code[pc]), 4);
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
+	VM_CALL(vm_settabup);
+	/* vm_settabup can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_SETUPVAL opcode
+ */
+static uint8_t *op_setupval_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_B(code[pc]), 4);
+	VM_CALL(vm_setupval);
+  return prog;
+}
+
+/**
+ * OP_SETTABLE opcode
+ */
+static uint8_t *op_settable_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
+	VM_CALL(luaV_settable);
+  return prog;
+}
+
+/**
+ * OP_NEWTABLE opcode
+ */
+static uint8_t *op_newtable_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	RABC_RDX(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_B(code[pc]), 4);
+	/* mov GETARG_C(i), %r8d */
+	APPEND2(0x41, 0xb8);
+	APPEND(GETARG_C(code[pc]), 4);
+	VM_CALL(vm_newtable);
+  return prog;
+}
+
+/**
+ * OP_SELF
+ */
+static uint8_t *op_self_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	RKBC_RCX(GETARG_C(code[pc]), p);
+	VM_CALL(vm_self);
+  return prog;
+}
+
+/**
+ * OP_ADD opcode
+ */
+static uint8_t *op_add_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+  /* cmpl $0x3, 0x8(%rdx)*/
+  APPEND4(0x83, 0x7a, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 27);
+  /* cmpl $0x3, 0x8(%rcx) */
+  APPEND4(0x83, 0x79, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 21);
+  /* movsd  (%rdx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x10, 0x02);
+  /* addsd  (%rcx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x58, 0x01);
+  /* movsd  %xmm0,(%rsi) */
+  APPEND4(0xf2, 0x0f, 0x11, 0x06);
+  /* movl   $0x3,0x8(%rsi) */
+  APPEND3(0xc7, 0x46, 0x08);
+  APPEND(LUA_TNUMBER, 4);
+  /* jmp offset */
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
+  /* --> Offset : mov    TM_ADD,%r8d */
+  APPEND2(0x41, 0xb8);
+  APPEND(TM_ADD, 4);
+  /* jmpq luaV_arith */
+	VM_CALL(luaV_arith);
+	/* vm_add can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_SUB opcode
+ */
+static uint8_t *op_sub_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+  /* cmpl $0x3, 0x8(%rdx)*/
+  APPEND4(0x83, 0x7a, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 27);
+  /* cmpl $0x3, 0x8(%rcx) */
+  APPEND4(0x83, 0x79, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 21);
+  /* movsd  (%rdx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x10, 0x02);
+  /* subsd  (%rcx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x5c, 0x01);
+  /* movsd  %xmm0,(%rsi) */
+  APPEND4(0xf2, 0x0f, 0x11, 0x06);
+  /* movl   $0x3,0x8(%rsi) */
+  APPEND3(0xc7, 0x46, 0x08);
+  APPEND(LUA_TNUMBER, 4);
+  /* jmp offset */
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
+  /* --> Offset : mov    TM_ADD,%r8d */
+  APPEND2(0x41, 0xb8);
+  APPEND(TM_ADD, 4);
+  /* jmpq luaV_arith */
+	VM_CALL(luaV_arith);
+	/* vm_add can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_MUL opcode
+ */
+static uint8_t *op_mul_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+  /* cmpl $0x3, 0x8(%rdx)*/
+  APPEND4(0x83, 0x7a, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 27);
+  /* cmpl $0x3, 0x8(%rcx) */
+  APPEND4(0x83, 0x79, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 21);
+  /* movsd  (%rdx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x10, 0x02);
+  /* mulsd  (%rcx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x59, 0x01);
+  /* movsd  %xmm0,(%rsi) */
+  APPEND4(0xf2, 0x0f, 0x11, 0x06);
+  /* movl   $0x3,0x8(%rsi) */
+  APPEND3(0xc7, 0x46, 0x08);
+  APPEND(LUA_TNUMBER, 4);
+  /* jmp offset */
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
+  /* --> Offset : mov    TM_ADD,%r8d */
+  APPEND2(0x41, 0xb8);
+  APPEND(TM_ADD, 4);
+  /* jmpq luaV_arith */
+	VM_CALL(luaV_arith);
+	/* vm_add can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_DIV opcode
+ */
+static uint8_t *op_div_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+  /* cmpl $0x3, 0x8(%rdx)*/
+  APPEND4(0x83, 0x7a, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 27);
+  /* cmpl $0x3, 0x8(%rcx) */
+  APPEND4(0x83, 0x79, 0x08, LUA_TNUMBER);
+  /* jne offset */
+  APPEND2(X86_JNE, 21);
+  /* movsd  (%rdx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x10, 0x02);
+  /* divsd  (%rcx),%xmm0 */
+  APPEND4(0xf2, 0x0f, 0x5e, 0x01);
+  /* movsd  %xmm0,(%rsi) */
+  APPEND4(0xf2, 0x0f, 0x11, 0x06);
+  /* movl   $0x3,0x8(%rsi) */
+  APPEND3(0xc7, 0x46, 0x08);
+  APPEND(LUA_TNUMBER, 4);
+  /* jmp offset */
+  APPEND2(X86_NJ, 6+VM_CALL_SZ);
+  /* --> Offset : mov    TM_ADD,%r8d */
+  APPEND2(0x41, 0xb8);
+  APPEND(TM_ADD, 4);
+  /* jmpq luaV_arith */
+	VM_CALL(luaV_arith);
+	/* vm_add can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_MOD opcode
+ */
+static uint8_t *op_mod_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+	VM_CALL(vm_mod);
+	/* vm_mod can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_POW opcode
+ */
+static uint8_t *op_pow_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* Get RKB */
+	RKBC_RDX(GETARG_B(code[pc]), p);
+	/* Get RKC */
+	RKBC_RCX(GETARG_C(code[pc]), p);
+	VM_CALL(vm_pow);
+	/* vm_mod can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_UNM
+ */
+static uint8_t *op_unm_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
 	/* mov %rbx, %rdi */ \
 	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
+	RABC_RSI(GETARG_A(code[pc])); \
 	/* Get RKB */ \
-	RKBC_RDX(GETARG_B(i)); \
-	/* Get RKC */ \
-	RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_add); \
-	/* vm_add can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_SUB \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	/* Get RKB */ \
-	RKBC_RDX(GETARG_B(i)); \
-	/* Get RKC */ \
-	RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_sub); \
-	/* vm_sub can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_MUL \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-    RABC_RSI(GETARG_A(i)); \
-    /* Get RKB */ \
-    RKBC_RDX(GETARG_B(i)); \
-    /* Get RKC */ \
-    RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_mul); \
-    /* vm_mul can realloc base, reset it */ \
-    LUA_UPDATE_BASE;
-
-#define JIT_OP_DIV \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-    RABC_RSI(GETARG_A(i)); \
-    /* Get RKB */ \
-    RKBC_RDX(GETARG_B(i)); \
-    /* Get RKC */ \
-    RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_div); \
-    /* vm_div can realloc base, reset it */ \
-    LUA_UPDATE_BASE;
-
-#define JIT_OP_MOD \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-    RABC_RSI(GETARG_A(i)); \
-    /* Get RKB */ \
-    RKBC_RDX(GETARG_B(i)); \
-    /* Get RKC */ \
-    RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_mod); \
-    /* vm_mod can realloc base, reset it */ \
-    LUA_UPDATE_BASE;
-
-#define JIT_OP_POW \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-    RABC_RSI(GETARG_A(i)); \
-    /* Get RKB */ \
-    RKBC_RDX(GETARG_B(i)); \
-    /* Get RKC */ \
-    RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_pow); \
-    /* vm_pow can realloc base, reset it */ \
-    LUA_UPDATE_BASE;
-
-#define JIT_OP_UNM \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	/* Get RKB */ \
-	RKBC_RDX(GETARG_B(i)); \
+	RKBC_RDX(GETARG_B(code[pc]), p); \
 	VM_CALL(vm_unm); \
 	/* vm_unm can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
+  return prog;
+}
 
-#define JIT_OP_GETTABUP \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov GETARG_B(i), %esi */ \
-	APPEND1(0xbe); \
-	APPEND(GETARG_B(i), 4); \
-	RKBC_RDX(GETARG_C(i)); \
-	RABC_RCX(GETARG_A(i)); \
-	VM_CALL(vm_gettabup); \
-	/* vm_gettabup can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
+/**
+ * OP_NOT opcode
+ */
+static uint8_t *op_not_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	RABC_RDI(GETARG_A(code[pc])); \
+	RABC_RSI(GETARG_B(code[pc])); \
+	VM_CALL(vm_not);
+  return prog;
+}
 
-#define JIT_OP_SETTABUP \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov GETARG_A(i), %esi */ \
-	APPEND1(0xbe); \
-	APPEND(GETARG_A(i), 4); \
-	RKBC_RDX(GETARG_B(i)); \
-	RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_settabup); \
-	/* vm_settabup can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
+/**
+ * OP_LEN opcode
+ */
+static uint8_t *op_len_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	RABC_RDX(GETARG_B(code[pc]));
+	VM_CALL(luaV_objlen);
+	/* luaV_objlen can realloc base, reset it */
+  return prog;
+}
 
-#define JIT_OP_MOVE \
-	LUA_ADD_SAVEDPC(1); \
-	RABC_RSI(GETARG_A(i)); \
-	RABC_RDX(GETARG_B(i)); \
-	/* mov (%rdx), %rax */ \
-	APPEND3(0x48, 0x8b, 0x02); \
-	/* mov %rax, (%rsi) */ \
-	APPEND3(0x48, 0x89, 0x06); \
-	/* mov 0x08(%rdx), %eax */ \
-	APPEND3(0x8b, 0x42, 0x08); \
-	/* mov %eax, 0x08(%rsi) */ \
-	APPEND3(0x89, 0x46, 0x08);
+/**
+ * OP_CONCAT opcode
+ */
+static uint8_t *op_concat_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov offset8(%r13), %rsi */
+	APPEND4(0x49, 0x8b, 0x75, offsetof(CallInfo, u.l.base));
+	/* mov GETARG_B(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_B(code[pc]), 4);
+	/* mov GETARG_C(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_C(code[pc]), 4);
+	VM_CALL(vm_concat);
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	RABC_RDX(GETARG_A(code[pc]));
+	RABC_RCX(GETARG_B(code[pc]));
+	VM_CALL(vm_setconcat);
+  return prog;
+}
 
-#define JIT_OP_CALL \
-	LUA_ADD_SAVEDPC(1); \
-	JIT_UPDATEOFFSET(addrs[pc+1]); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	/* mov GETARG_B(i), %edx */ \
-	APPEND1(0xba); \
-	APPEND(GETARG_B(i), 4); \
-	/* mov GETARG_C(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_C(i), 4); \
-	/* mov %r13, %r8 */ \
-	APPEND3(0x4d, 0x89, 0xe8); \
-	VM_CALL(vm_call); \
-	/* vm_call can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
+/**
+ * OP_JMP opcode
+ */
+static uint8_t *op_jmp_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	/* mov GETARG_A(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_A(code[pc]), 4);
+	VM_CALL(vm_jumpclose);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	APPEND1(X86_LJ);
+	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
+  return prog;
+}
 
-#define JIT_OP_CLOSURE \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r15, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xfe); \
-	RABC_RDX(GETARG_A(i)); \
-	/* mov %r13, %rcx */ \
-	APPEND3(0x4c, 0x89, 0xe9); \
-	/* movl GETARG_Bx(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_Bx(i), 4); \
-	VM_CALL(vm_closure); \
-	/* vm_closure can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_GETTABLE \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_B(i)); \
-	RKBC_RDX(GETARG_C(i)); \
-	RABC_RCX(GETARG_A(i)); \
-	VM_CALL(luaV_gettable); \
-	/* luaV_gettable can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_LEN \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	RABC_RDX(GETARG_B(i)); \
-	VM_CALL(luaV_objlen); \
-	/* luaV_objlen can realloc base, reset it */ \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_JMP \
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(i)); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	/* mov GETARG_A(i), %edx */ \
-	APPEND1(0xba); \
-	APPEND(GETARG_A(i), 4); \
-	VM_CALL(vm_jumpclose); \
-	APPEND1(X86_LJ); \
-	APPEND(addrs[pc+1+GETARG_sBx(i)] - addrs[pc+1], 4);
-
-#define JIT_OP_LT \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RKBC_RSI(GETARG_B(i)); \
-	RKBC_RDX(GETARG_C(i)); \
-	VM_CALL(luaV_lessthan); \
-	LUA_UPDATE_BASE; \
-	/* cmp GETARG_A(i), %eax */ \
-	APPEND1(0x3d); \
-	APPEND(GETARG_A(i), 4); \
-	APPEND2(X86_JE, 10); \
-	LUA_ADD_SAVEDPC(1); \
+/**
+ * OP_EQ opcode
+ */
+static uint8_t *op_eq_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
+	VM_CALL(vm_eq);
+	/* cmp GETARG_A(i), %eax */
+	APPEND1(0x3d);
+	APPEND(GETARG_A(code[pc]), 4);
+	APPEND2(X86_JE, 10);
+	LUA_ADD_SAVEDPC(1);
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
+  return prog;
+}
 
-#define JIT_OP_LE \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RKBC_RSI(GETARG_B(i)); \
-	RKBC_RDX(GETARG_C(i)); \
-	VM_CALL(luaV_lessequal); \
-	LUA_UPDATE_BASE; \
-	/* cmp GETARG_A(i), %eax */ \
-	APPEND1(0x3d); \
-	APPEND(GETARG_A(i), 4); \
-	APPEND2(X86_JE, 10); \
-	LUA_ADD_SAVEDPC(1); \
+/**
+ * OP_LT opcode
+ */
+static uint8_t *op_lt_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
+	VM_CALL(luaV_lessthan);
+	/* cmp GETARG_A(i), %eax */
+	APPEND1(0x3d);
+	APPEND(GETARG_A(code[pc]), 4);
+	APPEND2(X86_JE, 10);
+	LUA_ADD_SAVEDPC(1);
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
+  return prog;
+}
 
-#define JIT_OP_EQ \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RKBC_RSI(GETARG_B(i)); \
-	RKBC_RDX(GETARG_C(i)); \
-	VM_CALL(vm_eq); \
-	LUA_UPDATE_BASE; \
-	/* cmp GETARG_A(i), %eax */ \
-	APPEND1(0x3d); \
-	APPEND(GETARG_A(i), 4); \
-	APPEND2(X86_JE, 10); \
-	LUA_ADD_SAVEDPC(1); \
+/**
+ * OP_LE opcode
+ */
+static uint8_t *op_le_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RKBC_RSI(GETARG_B(code[pc]), p);
+	RKBC_RDX(GETARG_C(code[pc]), p);
+	VM_CALL(luaV_lessequal);
+	/* cmp GETARG_A(i), %eax */
+	APPEND1(0x3d);
+	APPEND(GETARG_A(code[pc]), 4);
+	APPEND2(X86_JE, 10);
+	LUA_ADD_SAVEDPC(1);
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
+  return prog;
+}
 
-#define JIT_OP_NEWTABLE \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	RABC_RDX(GETARG_A(i)); \
-	/* mov GETARG_B(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_B(i), 4); \
-	/* mov GETARG_C(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_C(i), 4); \
-	VM_CALL(vm_newtable); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_SETUPVAL \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	/* mov GETARG_B(i), %edx */ \
-	APPEND1(0xba); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_setupval);
-
-#define JIT_OP_GETUPVAL \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	/* mov GETARG_B(i), %edx */ \
-	APPEND1(0xba); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_getupval);
-
-#define JIT_OP_FORPREP \
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(i)); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	VM_CALL(vm_forprep); \
-	APPEND1(X86_LJ); \
-	APPEND(addrs[pc+1+GETARG_sBx(i)] - addrs[pc+1], 4); \
-
-#define JIT_OP_FORLOOP \
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(i)); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	VM_CALL(vm_forloop); \
-	/* cmpl %$0x1, %eax */ \
-	APPEND3(0x83, 0xf8, 0x01); \
-	/* je +offset */ \
-	APPEND2(0x0f, X86_JE+0x10); \
-	APPEND(addrs[pc+1+GETARG_sBx(i)] - addrs[pc+1], 4);
-
-#define JIT_OP_SETTABLE \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	RKBC_RDX(GETARG_B(i)); \
-	RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(luaV_settable); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_SELF \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	RKBC_RDX(GETARG_B(i)); \
-	RKBC_RCX(GETARG_C(i)); \
-	VM_CALL(vm_self); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_SETLIST \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	RABC_RDX(GETARG_A(i)); \
-	/* mov GETARG_B(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_B(i), 4); \
-	/* mov GETARG_C(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_C(i), 4); \
-	/* mov GETARG_Ax(i+1), %r9d */ \
-	APPEND2(0x41, 0xb9); \
-	APPEND(GETARG_Ax(c[pc+1]), 4); \
-	VM_CALL(vm_setlist); \
-	if (GET_OPCODE(c[pc+1]) == OP_EXTRAARG) { \
-		/* jump over OP_EXTRAARG */ \
-		LUA_ADD_SAVEDPC(2); \
-		APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]); \
-	} \
-	else { \
-		LUA_ADD_SAVEDPC(1); \
-		APPEND2(0x90, 0x90); \
-	}
-
-#define JIT_OP_TFORCALL \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	RABC_RDX(GETARG_A(i)); \
-	/* mov GETARG_C(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_C(i), 4); \
-	VM_CALL(vm_tforcall); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_TFORLOOP \
-	LUA_ADD_SAVEDPC(1+GETARG_sBx(i)); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	VM_CALL(vm_tforloop); \
-	/* cmpl %$0x1, %eax */ \
-	APPEND3(0x83, 0xf8, 0x01); \
-	APPEND2(0x0f, X86_JE+0x10); \
-	APPEND(addrs[pc+1+GETARG_sBx(i)] - addrs[pc+1], 4);
-
-#define JIT_OP_TEST \
-	LUA_ADD_SAVEDPC(1); \
-	RABC_RDI(GETARG_A(i)); \
-	/* mov GETARG_C(i), %esi */ \
-	APPEND1(0xbe); \
-	APPEND(GETARG_C(i), 4); \
-	VM_CALL(vm_test); \
-	/* cmpl %$0x1, %eax */ \
-	APPEND3(0x83, 0xf8, 0X01); \
-	APPEND2(X86_JNE, 10); \
-	LUA_ADD_SAVEDPC(1); \
+/**
+ * OP_TEST opcode
+ */
+static uint8_t *op_test_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	RABC_RDI(GETARG_A(code[pc]));
+	/* mov GETARG_C(i), %esi */
+	APPEND1(0xbe);
+	APPEND(GETARG_C(code[pc]), 4);
+	VM_CALL(vm_test);
+	/* cmpl %$0x1, %eax */
+	APPEND3(0x83, 0xf8, 0X01);
+	APPEND2(X86_JNE, 10);
+	LUA_ADD_SAVEDPC(1);
 	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
+  return prog;
+}
 
-#define JIT_OP_CONCAT \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r15, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xfe); \
-	/* mov GETARG_B(i), %edx */ \
-	APPEND1(0xba); \
-	APPEND(GETARG_B(i), 4); \
-	/* mov GETARG_C(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_C(i), 4); \
-	VM_CALL(vm_concat); \
-	LUA_UPDATE_BASE; \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	RABC_RDX(GETARG_A(i)); \
-	RABC_RCX(GETARG_B(i)); \
-	VM_CALL(vm_setconcat); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_VARARG \
-	LUA_ADD_SAVEDPC(1); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	/* mov %r15, %rdx */ \
-	APPEND3(0x4c, 0x89, 0xfa); \
-	/* movl GETARG_A(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_A(i), 4); \
-	/* movl GETARG_B(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_vararg); \
-	LUA_UPDATE_BASE;
-
-#define JIT_OP_EXTRAARG \
-	APPEND1(0x90);
-
-#define JIT_OP_TAILCALL \
-	LUA_ADD_SAVEDPC(1); \
-	JIT_UPDATEOFFSET(addrs[pc+1]); \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	/* mov %r13, %rsi */ \
-	APPEND3(0x4c, 0x89, 0xee); \
-	/*  mov %r15, %rdx */ \
-	APPEND3(0x4c, 0x89, 0xfa); \
-	/* movl GETARG_A(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_A(i), 4); \
-	/* movl GETARG_B(i), %r8d */ \
-	APPEND2(0x41, 0xb8); \
-	APPEND(GETARG_B(i), 4); \
-	VM_CALL(vm_tailcall); \
-	LUA_UPDATE_BASE; \
-	/* if C function we have to Jump to next return */ \
-	/* cmp $0x1, %eax */ \
-	APPEND3(0x83, 0xf8, 0x01); \
-	/* jeq +offset8 */ \
-	APPEND2(X86_JE, 26); \
-	RESTORE_REGISTERS; \
-	/* leaveq; retq */ \
-	APPEND2(0xc9, 0xc3);
-
-#define JIT_OP_TESTSET \
-	/* mov %rbx, %rdi */ \
-	APPEND3(0x48, 0x89, 0xdf); \
-	RABC_RSI(GETARG_A(i)); \
-	RABC_RDX(GETARG_B(i)); \
-	/* movl GETARG_C(i), %ecx */ \
-	APPEND1(0xb9); \
-	APPEND(GETARG_C(i), 4); \
+/**
+ * OP_TESTSET opcode
+ */
+static uint8_t *op_testset_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	RABC_RDX(GETARG_B(code[pc]));
+	/* movl GETARG_C(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_C(code[pc]), 4);
 	VM_CALL(vm_testset);
+	/* cmpl %$0x1, %eax */
+	APPEND3(0x83, 0xf8, 0x01);
+  /* je +offset */
+  APPEND2(X86_JNE, 10); /* jump to next OP (OP_JMP) */
+  /* else jump over the next OP_JUMP */
+	LUA_ADD_SAVEDPC(1);
+	APPEND2(X86_NJ, addrs[pc+2] - addrs[pc+1]);
+  return prog;
+}
+
+/**
+ * OP_CALL opcode
+ */
+static uint8_t *op_call_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */ \
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_B(code[pc]), 4);
+	/* mov GETARG_C(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_C(code[pc]), 4);
+	/* mov %r13, %r8 */
+	APPEND3(0x4d, 0x89, 0xe8);
+	VM_CALL(vm_call);
+	/* vm_call can realloc base, reset it */
+  return prog;
+}
+
+/**
+ * OP_TAILCALL opcaode
+ */
+static uint8_t *op_tailcall_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	/* movl GETARG_A(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_A(code[pc]), 4);
+	/* movl GETARG_B(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_B(code[pc]), 4);
+	VM_CALL(vm_tailcall);
+
+	/* if C function we have to Jump to next Lua return */
+	/* cmp $0x1, %eax */
+	APPEND3(0x83, 0xf8, 0x01);
+	/* jeq +offset8 */
+	APPEND2(X86_JE, 19);
+	RESTORE_REGISTERS;
+  APPEND1(0xb8);
+  APPEND(1, 4);
+	/* leaveq; retq */
+	APPEND2(0xc9, 0xc3);
+  return prog;
+}
+
+/**
+ * OP_RETURN opcode
+ */
+static uint8_t *op_return_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov %r13, %rdx */
+	APPEND3(0x4c, 0x89, 0xea);
+	/* mov GETARG_B(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_B(code[pc]), 4);
+	VM_CALL(vm_return);
+	RESTORE_REGISTERS;
+	/* leaveq; retq */
+	APPEND2(0xc9, 0xc3);
+  return prog;
+}
+
+/**
+ * OP_FORLOOP opcode
+ */
+static uint8_t *op_forloop_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	VM_CALL(vm_forloop);
+	/* cmpl %$0x1, %eax */
+	APPEND3(0x83, 0xf8, 0x01);
+  /* je +offset */
+  APPEND2(X86_JNE, 14);
+  /* else */
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	/* jmp +offset */
+	APPEND1(X86_LJ);
+	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
+  return prog;
+}
+
+/**
+ * OP_FORPREP opcode
+ */
+static uint8_t *op_forprep_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	VM_CALL(vm_forprep);
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	APPEND1(X86_LJ);
+	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
+  return prog;
+}
+
+/**
+ * OP_TFORCALL opcode
+ */
+static uint8_t *op_tforcall_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	RABC_RDX(GETARG_A(code[pc]));
+	/* mov GETARG_C(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_C(code[pc]), 4);
+	VM_CALL(vm_tforcall);
+  return prog;
+}
+
+/**
+ * OP_TFORLOOP opcode
+ */
+static uint8_t *op_tforloop_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	VM_CALL(vm_tforloop);
+	/* cmpl %$0x1, %eax */
+	APPEND3(0x83, 0xf8, 0x01);
+  APPEND2(X86_JNE, 14); /* jump to next op */
+  /* else */
+	LUA_ADD_SAVEDPC(GETARG_sBx(code[pc]));
+	APPEND1(X86_LJ);
+	APPEND(addrs[pc+1+GETARG_sBx(code[pc])] - addrs[pc+1], 4);
+  return prog;
+}
+
+/**
+ * OP_SETLIST opcode
+ */
+static uint8_t *op_setlist_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	RABC_RDX(GETARG_A(code[pc]));
+	/* mov GETARG_B(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_B(code[pc]), 4);
+	/* mov GETARG_C(i), %r8d */
+	APPEND2(0x41, 0xb8);
+	APPEND(GETARG_C(code[pc]), 4);
+	/* mov GETARG_Ax(i+1), %r9d */
+	APPEND2(0x41, 0xb9);
+	APPEND(GETARG_Ax(code[pc+1]), 4);
+	VM_CALL(vm_setlist);
+  return prog;
+}
+
+/**
+ * OP_CLOSURE opcode
+ */
+static uint8_t *op_closure_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	RABC_RSI(GETARG_A(code[pc]));
+	/* mov %r13, %rdx */
+	APPEND3(0x4c, 0x89, 0xea);
+	/* movl GETARG_Bx(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_Bx(code[pc]), 4);
+	VM_CALL(vm_closure);
+  return prog;
+}
+
+/**
+ * OP_VARARG opcode
+ */
+static uint8_t *op_vararg_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+	/* mov %rbx, %rdi */
+	APPEND3(0x48, 0x89, 0xdf);
+	/* mov %r13, %rsi */
+	APPEND3(0x4c, 0x89, 0xee);
+	/* movl GETARG_A(i), %edx */
+	APPEND1(0xba);
+	APPEND(GETARG_A(code[pc]), 4);
+	/* movl GETARG_B(i), %ecx */
+	APPEND1(0xb9);
+	APPEND(GETARG_B(code[pc]), 4);
+	VM_CALL(vm_vararg);
+  return prog;
+}
+
+/**
+ * OP_EXTRAARG opcode
+ */
+static uint8_t *op_extraarg_create(uint8_t *bin, Proto *p, const Instruction *code,
+    unsigned int *addrs, int pc)
+{
+  uint8_t *prog = bin;
+  NOP;
+  return prog;
+}
+
+static uint8_t *(*jit_create_funcs[NUM_OPCODES]) (uint8_t *bin, Proto *p, const Instruction *code, unsigned int *addrs, int pc) =
+{
+  op_move_create,/* OP_MOVE,	A B	R(A) := R(B)					*/
+  op_loadk_create,/* OP_LOADK,	A Bx	R(A) := Kst(Bx)					*/
+  op_loadkx_create,/* OP_LOADKX,	A	R(A) := Kst(extra arg)				*/
+  op_loadbool_create,/* OP_LOADBOOL,	A B C	R(A) := (Bool)B; if (C) pc++			*/
+  op_loadnil_create,/* OP_LOADNIL,	A B	R(A), R(A+1), ..., R(A+B) := nil		*/
+  op_getupval_create,/* OP_GETUPVAL,	A B	R(A) := UpValue[B]				*/
+  op_gettabup_create,/* OP_GETTABUP,	A B C	R(A) := UpValue[B][RK(C)]			*/
+  op_gettable_create,/* OP_GETTABLE,	A B C	R(A) := R(B)[RK(C)]				*/
+  op_settabup_create,/* OP_SETTABUP,A B C	UpValue[A][RK(B)] := RK(C)			*/
+  op_setupval_create,/* OP_SETUPVAL,	A B	UpValue[B] := R(A)				*/
+  op_settable_create,/* OP_SETTABLE,	A B C	R(A)[RK(B)] := RK(C)				*/
+  op_newtable_create,/* OP_NEWTABLE,	A B C	R(A) := {} (size = B,C)				*/
+  op_self_create,/* OP_SELF,	A B C	R(A+1) := R(B); R(A) := R(B)[RK(C)]		*/
+  op_add_create,/* OP_ADD,	A B C	R(A) := RK(B) + RK(C)				*/
+  op_sub_create,/* OP_SUB,	A B C	R(A) := RK(B) - RK(C)				*/
+  op_mul_create,/* OP_MUL,	A B C	R(A) := RK(B) * RK(C)				*/
+  op_div_create,/* OP_DIV,	A B C	R(A) := RK(B) / RK(C)				*/
+  op_mod_create,/* OP_MOD,	A B C	R(A) := RK(B) % RK(C)				*/
+  op_pow_create,/* OP_POW,	A B C	R(A) := RK(B) ^ RK(C)				*/
+  op_unm_create,/* OP_UNM,	A B	R(A) := -R(B)					*/
+  op_not_create,/* OP_NOT,	A B	R(A) := not R(B)				*/
+  op_len_create,/* OP_LEN,	A B	R(A) := length of R(B)				*/
+  op_concat_create,/* OP_CONCAT,	A B C	R(A) := R(B).. ... ..R(C)			*/
+  op_jmp_create,/* OP_JMP,	A sBx	pc+=sBx; if (A) close all upvalues >= R(A) + 1	*/
+  op_eq_create,/* OP_EQ,	A B C	if ((RK(B) == RK(C)) ~= A) then pc++		*/
+  op_lt_create,/* OP_LT,	A B C	if ((RK(B) <  RK(C)) ~= A) then pc++		*/
+  op_le_create,/* OP_LE,	A B C	if ((RK(B) <= RK(C)) ~= A) then pc++		*/
+  op_test_create,/* OP_TEST,	A C	if not (R(A) <=> C) then pc++			*/
+  op_testset_create,/* OP_TESTSET,	A B C	if (R(B) <=> C) then R(A) := R(B) else pc++	*/
+  op_call_create,/* OP_CALL,	A B C	R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1)) */
+  op_tailcall_create,/* OP_TAILCALL,	A B C	return R(A)(R(A+1), ... ,R(A+B-1))		*/
+  op_return_create,/* OP_RETURN,	A B	return R(A), ... ,R(A+B-2)	(see note)	*/
+  op_forloop_create,/* OP_FORLOOP,	A sBx	R(A)+=R(A+2);
+                       if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }*/
+  op_forprep_create,/* OP_FORPREP,	A sBx	R(A)-=R(A+2); pc+=sBx				*/
+  op_tforcall_create,/* OP_TFORCALL,	A C	R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));	*/
+  op_tforloop_create,/* OP_TFORLOOP,	A sBx	if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }*/
+  op_setlist_create,/* OP_SETLIST,	A B C	R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B	*/
+  op_closure_create,/* OP_CLOSURE,	A Bx	R(A) := closure(KPROTO[Bx])			*/
+  op_vararg_create,/* OP_VARARG,	A B	R(A), R(A+1), ..., R(A+B-2) = vararg		*/
+  op_extraarg_create/* OP_EXTRAARG	Ax	extra (larger) argument for previous opcode	*/
+};
 
 #endif

@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define ljit_c
 #define LUA_CORE
@@ -15,6 +16,7 @@
 #include "../lopcodes.h"
 #include "../lstate.h"
 #include "../lvm.h"
+#include "../lauxlib.h"
 #include "ljit.h"
 
 #if defined LUA_USE_JIT_LINUX_X86_64
@@ -27,195 +29,308 @@
 #error "Jit is not supported for this plateform"
 #endif
 
-static int get_jit_size(lua_State *L, Proto *p)
+int luaJ_create(lua_State* L, Proto *p)
 {
-	int len = 0, pc, sz;
-	const Instruction* c = p->code;
-
-	for (len = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-		Instruction i = c[pc];
-		sz = jit_opcodes[GET_OPCODE(i)];
-		if (!sz) {
-			luaG_runerror(L, "Unknown instruction size for %s\n", luaP_opnames[GET_OPCODE(i)]);
-			return sz;
-		}
-		len += sz;
-	}
-	return len;
-}
-
-static int get_jit(lua_State* L, CallInfo *ci, Proto *p)
-{
-	uint8_t *prog;
-	int pc, proglen;
+	uint8_t *prog, *tmp, *orig;
+	int pc;
 	unsigned int *addrs; /* addresses of image addr offset */
-	const Instruction* c = p->code;
+	const Instruction* code = p->code;
 
-	prog = p->jit;
-
-	/* SetUp max addresses for Jumps */
-	addrs = malloc(sizeof(*addrs)*(p->sizecode+1));
-	if (!addrs) return 1;
-
-	for (proglen = PROLOGUE_LEN, pc = 0; pc < p->sizecode; pc++) {
-		Instruction i = c[pc];
-		addrs[pc]= proglen;
-		proglen += jit_opcodes[GET_OPCODE(i)];
-	}
-	/* offset addrss for the least instruction */
-	addrs[pc] = proglen;
-
-	if (p->sizecode > 0) {
-		/* Prologue */
-		uint8_t *tmp = prog;
-		JIT_PROLOGUE;
-		if (prog - tmp != PROLOGUE_LEN) {
-			luaG_runerror(L, "Bad function prologue size for %d/%d\n", (prog - tmp), PROLOGUE_LEN);
-		}
-		/* End of prologue */
-	}
-	else {
-		free(addrs);
-		return -1;
-	}
-
-	for (pc = 0; pc < p->sizecode; pc++)  {
-		uint8_t *tmp = prog;
-		uint32_t clen = 0;
-		Instruction i = c[pc];
-
-		switch(GET_OPCODE(i)) {
-			/**
-			 * Return case
-			 */
-			CASE_OP(OP_RETURN)
-			CASE_OP(OP_LOADK)
-			CASE_OP(OP_LOADKX)
-			CASE_OP(OP_EXTRAARG)
-			CASE_OP(OP_LOADBOOL)
-			CASE_OP(OP_LOADNIL)
-			CASE_OP(OP_NOT)
-			CASE_OP(OP_ADD)
-			CASE_OP(OP_SUB)
-			CASE_OP(OP_MUL)
-			CASE_OP(OP_DIV)
-			CASE_OP(OP_MOD)
-			CASE_OP(OP_POW)
-			CASE_OP(OP_UNM)
-			CASE_OP(OP_GETTABUP)
-			CASE_OP(OP_SETTABUP)
-			CASE_OP(OP_MOVE)
-			CASE_OP(OP_CALL)
-			CASE_OP(OP_CLOSURE)
-			CASE_OP(OP_GETTABLE)
-			CASE_OP(OP_LEN)
-			CASE_OP(OP_JMP)
-			CASE_OP(OP_LT)
-			CASE_OP(OP_LE)
-			CASE_OP(OP_EQ)
-			CASE_OP(OP_NEWTABLE)
-			CASE_OP(OP_SETUPVAL)
-			CASE_OP(OP_GETUPVAL)
-			CASE_OP(OP_FORPREP)
-			CASE_OP(OP_FORLOOP)
-			CASE_OP(OP_SETTABLE)
-			CASE_OP(OP_SELF)
-			CASE_OP(OP_SETLIST)
-			CASE_OP(OP_TFORCALL)
-			CASE_OP(OP_TFORLOOP)
-			CASE_OP(OP_TEST)
-			CASE_OP(OP_TESTSET)
-			CASE_OP(OP_CONCAT)
-			CASE_OP(OP_VARARG)
-			CASE_OP(OP_TAILCALL)
-
-			default:
-				luaG_runerror(L, "Unknown instruction %s - please investigate\n", luaP_opnames[GET_OPCODE(i)]);
-				free(addrs);
-				return -1;
-		}
-		clen = prog - tmp;
-		if (clen != jit_opcodes[GET_OPCODE(i)]) {
-			luaG_runerror(L, "Bad instruction size for instruction %s - %d/%d\n",
-					luaP_opnames[GET_OPCODE(i)], clen, jit_opcodes[GET_OPCODE(i)]);
-		}
-
-	}
-	free(addrs);
-	return 0;
-}
-
-
-int luaJ_create(lua_State* L, CallInfo *ci)
-{
-	Proto *p;
-	const char* s;
-
-	if (!L) return 1;
-	if (!lua_getjit(L)) return 0;
-
-
-	p = clLvalue(ci->func)->p;
-	if (!p) {
-		luaG_runerror(L, "luaJ_create: cannot get function to jit\n");
-		return 1;
-	}
-
-	s = p->source ? getstr(p->source) : "=?";
-	if (*s=='@' || *s=='=')
-		s++;
-	else if (*s==LUA_SIGNATURE[0])
-		s="(bstring)";
-	else
-		s="(string)";
+	if (!L || !p) return 1;
 
 	if (p->sizejit && p->jit) {
-		luaJ_init_offset(ci);
 		return 0;
 	}
 
-	p->sizejit = get_jit_size(L, p);
-	if (!p->sizejit) {
-		luaG_runerror(L, "luaJ_create: cannot get jit size for %s (from %d to %d)\n",
-				s, p->linedefined, p->lastlinedefined);
-		p->jit = NULL;
-		return 1;
-	}
+  p->called = 0;
 
-	if (jit_alloc(p) == 1) {
+  /**
+   * Alloc temporary code buffer
+   */
+  prog = luaM_malloc(L, (p->sizecode+1)*OP_SZ_MAX);
+  if (!prog) {
+    luaG_runerror(L, "No enougth memory to alloc Jit temporary code\n");
+    return 1;
+  }
+
+	/* SetUp max addresses for Jumps and initialize it */
+  addrs = luaM_newvector(L, p->sizecode+1, unsigned int);
+	if (!addrs) {
+    luaG_runerror(L, "Not enougth memory to alloc Jit addresses\n");
+    luaM_free(L, prog);
+    return 1;
+  }
+  for (pc = 0; pc <= p->sizecode; pc++) addrs[pc] = JITADDR_NONE;
+
+  /**
+   * Fist pass - prologue, then code
+   */
+  tmp = prog;
+  orig= prog;
+  JIT_PROLOGUE;
+  addrs[0] = prog - tmp;
+  for (pc = 0; pc < p->sizecode; pc++)  {
+    Instruction i = code[pc];
+
+    tmp = prog;
+    prog = op_generic(prog, p, code, addrs, pc);
+    prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
+    addrs[pc+1] = addrs[pc] + prog - tmp;
+  }
+
+  /**
+   * Verify addrs and get final size
+   */
+  for (pc = 0; pc <= p->sizecode; pc++) {
+    if (addrs[pc] == JITADDR_NONE) {
+      luaG_runerror(L, "Error on Jit generation\n");
+      luaM_free(L, prog);
+      luaM_free(L, addrs);
+      return 1;
+    }
+  }
+  p->sizejit = addrs[p->sizecode];
+
+  /**
+   * Alloc real buffer and free temporary one
+   */
+	if (jit_alloc(p)) {
 		luaG_runerror(L, "luaJ_create: cannot alloc memory (%d bytes) for %s (from %d to %d)\n",
-				p->sizejit, s, p->linedefined, p->lastlinedefined);
+				p->sizejit, p->source ? getstr(p->source) : "?", p->linedefined,
+        p->lastlinedefined);
 		return 1;
 	}
+  luaM_free(L, orig);
 
-	if (get_jit(L, ci, p) != 0) {
-		jit_free(p);
-		luaG_runerror(L, "luaJ_create: cannot create code (%d bytes) for %s (from %d to %d)\n",
-				p->sizejit, s, p->linedefined, p->lastlinedefined);
-		return 1;
-	}
+  /**
+   * Second pass
+   */
+  prog = p->jit;
+  tmp = prog;
+  JIT_PROLOGUE;
+  addrs[0] = prog - tmp;
+  for (pc = 0; pc < p->sizecode; pc++)  {
+    Instruction i = code[pc];
 
-
-#ifdef JIT_DEBUG
-	{
-		const char* s=p->source ? getstr(p->source) : "=?";
-		if (*s=='@' || *s=='=')
-			s++;
-		else if (*s==LUA_SIGNATURE[0])
-			s="(bstring)";
-		else
-			s="(string)";
-		fprintf(stderr, "\n%s <%s:%d,%d> at %p (%d)\n",
-			p->linedefined==0?"main":"function", s,
-			p->linedefined,p->lastlinedefined, p->jit, p->sizejit);
-	}
-#endif
-	luaJ_init_offset(ci);
-	return 0;
+    tmp = prog;
+    prog = op_generic(prog, p, code, addrs, pc);
+    prog = jit_create_funcs[GET_OPCODE(i)](prog, p, code, addrs, pc);
+    addrs[pc+1] = addrs[pc] + prog - tmp;
+  }
+  p->addrs = addrs;
+  /**
+   * Clen opcodes stats
+   */
+  for(pc = 0; pc < NUM_OPCODES; pc++) {
+    p->opcodes[pc] = 0;
+  }
+  return 0;
 }
 
-void luaJ_init_offset(CallInfo *ci)
+void luaJ_free(lua_State* L, Proto *p)
 {
-	/* Create initial offset for jmpq in prologu */
-	ci->u.l.jitoffset = PROLOGUE_LEN;
+  p->sizejit = 0;
+  jit_free(p);
+  luaM_free(L, p->addrs);
 }
+
+/**
+ * Jit Add/Remove functions
+ */
+static inline void jit_set_proto(lua_State *L, Proto *p, int state)
+{
+  int i;
+  if (state) luaJ_create(L, p);
+  else luaJ_free(L, p);
+  for(i = 0; i < p->sizep; i++) {
+    jit_set_proto(L, p->p[i], state);
+  }
+}
+
+static inline int jit_add_remove(lua_State *L, int state)
+{
+  int i, n = lua_gettop(L);
+  Proto *p;
+
+  if (n == 0) {
+    CallInfo *ci = L->ci->previous;
+    if (ci && ttisLclosure(ci->func)) {
+      jit_set_proto(L, clLvalue(ci->func)->p, state);
+    }
+  }
+  else {
+    for (i = 1; i <= n; i++) {
+      p = lua_tolfunction(L, i);
+      if (p) {
+        jit_set_proto(L, p, state);
+      }
+    }
+  }
+  return 0;
+}
+
+static int jit_add(lua_State *L)
+{
+  return jit_add_remove(L, 1);
+}
+
+static int jit_remove(lua_State *L)
+{
+  return jit_add_remove(L, 0);
+}
+
+/**
+ * Jit debug functions
+ */
+static inline void jit_debug_proto(lua_State *L, Proto *p, luaL_Buffer *b)
+{
+  int i, sz;
+  unsigned long total = 0;
+  const char* s = p->source ? getstr(p->source) : "?";
+  char *r = luaL_prepbuffer(b);
+
+  if (p->jit != NULL) {
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
+    luaL_addsize(b, sz);
+    for (i = 0; i < NUM_OPCODES; i++) {
+      if (p->opcodes[i]) {
+        r = luaL_prepbuffer(b);
+        sz = sprintf(r, "  %s: %d\n", luaP_opnames[i], p->opcodes[i]);
+        luaL_addsize(b, sz);
+        total+= p->opcodes[i];
+      }
+    }
+    r = luaL_prepbuffer(b);
+    sz = sprintf(r, "  Total: %lu\n", total);
+    luaL_addsize(b, sz);
+  }
+
+  for(i = 0; i < p->sizep; i++) {
+    jit_debug_proto(L, p->p[i], b);
+  }
+}
+
+static inline void jit_list_proto(lua_State *L, Proto *p, luaL_Buffer *b)
+{
+  int i, sz;
+  const char* s = p->source ? getstr(p->source) : "?";
+  char *r = luaL_prepbuffer(b);
+
+  if (p->jit != NULL) {
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes) called %d times\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit, p->called);
+    luaL_addsize(b, sz);
+  }
+
+  for(i = 0; i < p->sizep; i++) {
+    jit_list_proto(L, p->p[i], b);
+  }
+}
+
+static int jit_debug(lua_State *L)
+{
+  int i, n = lua_gettop(L);
+  Proto *p;
+  luaL_Buffer b;
+  luaL_buffinit(L,&b);
+
+  if (n == 0) {
+    CallInfo *ci = L->ci->previous;
+    if (ci && ttisLclosure(ci->func)) {
+      Proto *p = clLvalue(ci->func)->p;
+      jit_debug_proto(L, p, &b);
+    }
+  }
+  else {
+    for (i = 1; i <= n; i++) {
+      p = lua_tolfunction(L, i);
+      if (p) {
+        jit_debug_proto(L, p, &b);
+      }
+    }
+  }
+  luaL_pushresult(&b);
+  return 1;
+}
+
+static int jit_list(lua_State *L)
+{
+  CallInfo *ci = L->ci->previous;
+  luaL_Buffer b;
+  luaL_buffinit(L,&b);
+  if (ci && ttisLclosure(ci->func)) {
+    Proto *p = clLvalue(ci->func)->p;
+    jit_list_proto(L, p, &b);
+  }
+  luaL_pushresult(&b);
+  return 1;
+}
+
+static int jit_dump(lua_State *L)
+{
+  luaL_Buffer b;
+  Proto *p = lua_tolfunction(L, 1);
+
+  luaL_buffinit(L,&b);
+
+  if (p && p->jit) {
+    const char* s = p->source ? getstr(p->source) : "?";
+    int i, pc, sz;
+    char *r;
+
+    /* dump base informations  & prologue */
+    r = luaL_prepbuffer(&b);
+    sz = sprintf(r, "%s <%s:%d,%d> at %p (%d bytes)\nJit Prologue\n",
+        p->linedefined == 0 ? "main":"function", s,
+        p->linedefined,p->lastlinedefined, p->jit, p->sizejit);
+    luaL_addsize(&b, sz);
+    for (i = 0; i < p->addrs[0]; i++) {
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%02x %s", p->jit[i], (i+1)%8 == 0?"\n":"");
+      luaL_addsize(&b, sz);
+    }
+    r = luaL_prepbuffer(&b);
+    sz = sprintf(r, "%s", "\n");
+    luaL_addsize(&b, sz);
+
+    /**
+     * Walk through all opcodes
+     */
+    for (pc = 1; pc <= p->sizecode; pc++) {
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%s (%d)\n", luaP_opnames[GET_OPCODE(p->code[pc-1])],
+          p->addrs[pc] - p->addrs[pc-1]);
+      luaL_addsize(&b, sz);
+      /* for this opcode, dump code */
+      for (i = p->addrs[pc-1]; i < p->addrs[pc]; i++) {
+        r = luaL_prepbuffer(&b);
+        sz = sprintf(r, "%02x %s", p->jit[i], (i-p->addrs[pc-1]+1)%8 == 0?"\n":"");
+        luaL_addsize(&b, sz);
+      }
+      r = luaL_prepbuffer(&b);
+      sz = sprintf(r, "%s", "\n");
+      luaL_addsize(&b, sz);
+    }
+  }
+  luaL_pushresult(&b);
+  return 1;
+}
+
+
+static const luaL_Reg jitlib[] = {
+  {"add", jit_add},
+  {"remove", jit_remove},
+  {"debug", jit_debug},
+  {"list", jit_list},
+  {"dump", jit_dump},
+  {NULL, NULL}
+};
+
+LUAMOD_API int luaopen_jit (lua_State *L) {
+  luaL_newlib(L, jitlib);
+  return 1;
+}
+

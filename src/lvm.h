@@ -1,5 +1,5 @@
 /*
-** $Id: lvm.h,v 2.18 2013/01/08 14:06:55 roberto Exp $
+** $Id: lvm.h,v 2.18.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Lua virtual machine
 ** See Copyright Notice in lua.h
 */
@@ -48,4 +48,5 @@ LUAI_FUNC void luaV_objlen (lua_State *L, StkId ra, const TValue *rb);
 LUAI_FUNC Closure *getcached (Proto *p, UpVal **encup, StkId base);
 LUAI_FUNC void pushclosure (lua_State *L, Proto *p, UpVal **encup, StkId base,
 		                         StkId ra);
+LUAI_FUNC void traceexec (lua_State *L);
 #endif
